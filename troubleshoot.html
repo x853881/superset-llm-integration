@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Assistant: when the panel doesn't appear</title>
+<style>
+  :root { --ink: #1d2125; --muted: #5b636b; --line: #d8dde2; --soft: #f3f5f7; --accent: #1f6feb; --warn: #9a3412; }
+  @media (prefers-color-scheme: dark) {
+    :root { --ink: #e6e9ec; --muted: #a2aab3; --line: #3a4148; --soft: #22272c; --accent: #6ea8fe; --warn: #fdba74; }
+    body { background: #181b1f; }
+  }
+  body { font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); margin: 0; }
+  main { max-width: 54rem; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+  h1 { font-size: 1.7rem; margin: 0 0 .5rem; }
+  h2 { font-size: 1.25rem; margin: 2.5rem 0 .5rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+  h3 { font-size: 1.05rem; margin: 1.75rem 0 .25rem; }
+  p, li { max-width: 46rem; }
+  code { font: .9em ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--soft); padding: .1em .3em; border-radius: 4px; }
+  .muted { color: var(--muted); }
+  .where { display: flex; flex-wrap: wrap; gap: .75rem 1.25rem; align-items: end; background: var(--soft);
+           border: 1px solid var(--line); border-radius: 8px; padding: 1rem; margin: 1.5rem 0; }
+  .where label { display: flex; flex-direction: column; font-size: .85rem; color: var(--muted); gap: .2rem; }
+  .where input, .where select { font: inherit; color: var(--ink); background: transparent; border: 1px solid var(--line);
+           border-radius: 6px; padding: .3rem .5rem; min-width: 12rem; }
+  .where [hidden] { display: none; }
+  .block { position: relative; margin: .75rem 0 1rem; }
+  .block pre { margin: 0; background: var(--soft); border: 1px solid var(--line); border-radius: 8px; padding: .9rem 5rem .9rem 1rem;
+           overflow: auto; max-height: 22rem; font: .82rem/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .block button { position: absolute; top: .5rem; right: .5rem; font: .8rem system-ui, sans-serif; cursor: pointer;
+           border: 1px solid var(--line); background: var(--accent); color: #fff; border-radius: 6px; padding: .25rem .7rem; }
+  table { border-collapse: collapse; width: 100%; margin: .75rem 0; font-size: .95rem; }
+  th, td { text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); padding: .45rem .6rem .45rem 0; }
+  th { color: var(--muted); font-weight: 600; font-size: .85rem; }
+  a { color: var(--accent); }
+  .warn { color: var(--warn); }
+</style>
+</head>
+<body>
+<main>
+<h1>When the AI Assistant panel doesn't appear</h1>
+<p>Three checks, a few minutes each. Each one prints what it found, and the table under it says what that means
+and which fix to go to. If it's still unclear, send the outputs over: they hold no keys or passwords.</p>
+<p class="muted">The panel has to get past five things before it shows: Superset has extensions turned on, Superset
+loads the plugin's <code>.supx</code>, your role may load extensions, the browser runs this version of the plugin,
+and your role has a permission on <code>nltosqlandback</code>.</p>
+
+<div class="where">
+  <label>Superset runs on
+    <select id="runs-on">
+      <option value="k8s">Kubernetes (Helm)</option>
+      <option value="compose">Docker compose</option>
+    </select>
+  </label>
+  <label data-for="k8s">Namespace
+    <input id="ns" placeholder="leave empty for the current one" spellcheck="false">
+  </label>
+  <label data-for="k8s">Superset web deployment
+    <input id="deploy" placeholder="kubectl get deploy" spellcheck="false">
+  </label>
+  <label data-for="compose" hidden>Compose service
+    <input id="service" spellcheck="false">
+  </label>
+  <span class="muted" style="font-size:.85rem">The commands below follow these. Saved in this browser.</span>
+</div>
+
+<h2 id="build">0. Which build should be running</h2>
+<p>In your checkout of this repo, the one you built the <code>.supx</code> from:</p>
+<div class="block"><pre>git rev-parse --short HEAD</pre></div>
+<p>That's the commit the checks below should report. If the build was made with uncommitted changes, they say
+<code>&lt;commit&gt; with local changes</code>.</p>
+<p>Check the <code>.supx</code> you built has the panel's code in it:</p>
+<div class="block"><pre>unzip -l nltosqlandback-0.1.0.supx | grep remoteEntry</pre></div>
+<p>No line means the frontend build failed. <code>superset-extensions bundle</code> prints
+<code>❌ Frontend build failed</code> and then carries on, writing a <code>.supx</code> with only the backend in it.
+To see why it failed, run the frontend build on its own and look at the first error:</p>
+<div class="block"><pre>cd frontend && npm run build</pre></div>
+<p class="muted"><a href="troubleshoot-build.html">troubleshoot-build.html</a> checks the build machine and says
+what the errors mean.</p>
+
+<h2 id="browser">1. In the browser</h2>
+<ol>
+  <li>Open SQL Lab, signed in as the user who can't see the panel.</li>
+  <li>Open the browser's developer tools and go to <b>Console</b>: <code>F12</code>, or
+      <code>Cmd+Option+J</code> on a Mac (Chrome, Edge) / <code>Cmd+Option+K</code> (Firefox).</li>
+  <li>Copy the block below and paste it into the console, then press Enter. The first time, Chrome and Firefox
+      refuse the paste and ask you to type <code>allow pasting</code> first. Do that, then paste again.</li>
+  <li>It prints a report and, last, a one-line answer. The report is also copied to the clipboard where the
+      browser allows it; otherwise copy it from the console.</li>
+</ol>
+<div class="block"><pre id="browser-check-shown"></pre></div>
+
+<table>
+  <tr><th>The answer says</th><th>Meaning</th><th>Go to</th></tr>
+  <tr><td>ENABLE_EXTENSIONS is off</td><td>Superset isn't reading the config that turns extensions on.</td><td><a href="#fix-flag">Turn extensions on</a></td></tr>
+  <tr><td>None of your roles can list extensions</td><td>Superset's own check: no extension loads for this user.</td><td><a href="#fix-superset-roles">Let the role load extensions</a></td></tr>
+  <tr><td>Superset loaded no copy of the plugin</td><td>The <code>.supx</code> isn't where Superset looks, or didn't load.</td><td><a href="#server">Check 2</a>, then <a href="#fix-path">Put the .supx where Superset looks</a></td></tr>
+  <tr><td>its .supx has no frontend</td><td>The frontend build failed when the <code>.supx</code> was made.</td><td><a href="#build">Step 0</a></td></tr>
+  <tr><td>The plugin's bundle didn't download</td><td>The browser couldn't fetch the plugin's code.</td><td><a href="#fix-superset-roles">Let the role load extensions</a>, then the server log</td></tr>
+  <tr><td>no code from this version ran</td><td>An older <code>.supx</code> is loaded, or the code failed: look for red errors above it.</td><td><a href="#fix-old">Replace an old .supx</a></td></tr>
+  <tr><td>hidden: none of your roles …</td><td>The plugin runs but hides the panel from this user.</td><td><a href="#fix-panel-roles">Give the panel permission</a></td></tr>
+  <tr><td>The panel should be in SQL Lab's right sidebar</td><td>Everything passed. Check <code>build</code> in the report matches step 0.</td><td><a href="#fix-sidebar">Open the sidebar</a></td></tr>
+</table>
+
+<h2 id="server">2. In the Superset container</h2>
+<p>This starts Superset's app inside the running container, the same way the web server does, and prints the
+settings it ends up with. It reads files and Superset's own role tables; it runs no SQL against your databases.
+Run it from a terminal that can reach the cluster<span data-for="compose" hidden>, in the Superset checkout's
+folder</span>.</p>
+<div class="block"><pre id="server-command"></pre></div>
+<p class="muted">If it prints nothing, run it again without <code>2&gt;/dev/null</code> to see the error.</p>
+
+<table>
+  <tr><th>Section</th><th>Look for</th><th>If not</th></tr>
+  <tr><td>Config</td><td><code>ENABLE_EXTENSIONS: True</code>, and <code>EXTENSIONS_PATH</code> a folder that exists.</td><td><a href="#fix-flag">Turn extensions on</a>, <a href="#fix-path">Put the .supx where Superset looks</a></td></tr>
+  <tr><td>.supx files</td><td>One <code>waxwing.nltosqlandback</code>, copied when you think, with a <code>remoteEntry</code> file and the build from step 0.</td><td><a href="#fix-old">Replace an old .supx</a></td></tr>
+  <tr><td>Loaded by Superset</td><td><code>waxwing.nltosqlandback</code></td><td><a href="#log">Check 3</a> says why</td></tr>
+  <tr><td>Plugin backend</td><td>Your model service's host and model, and the settings you chose.</td><td><a href="#fix-settings">Our settings aren't read</a></td></tr>
+  <tr><td>Roles</td><td>The user's role says <code>yes</code> to listing and fetching, and has at least 1 on the panel.</td><td><a href="#fix-superset-roles">Let the role load extensions</a>, <a href="#fix-panel-roles">Give the panel permission</a></td></tr>
+</table>
+
+<h2 id="log">3. The start-up log</h2>
+<div class="block"><pre id="log-command"></pre></div>
+<table>
+  <tr><th>Line</th><th>Meaning</th></tr>
+  <tr><td><code>Loaded extension 'waxwing.nltosqlandback' from …</code></td><td>Superset found and read the <code>.supx</code>.</td></tr>
+  <tr><td><code>Extensions path does not exist or is empty</code></td><td><code>EXTENSIONS_PATH</code> is wrong for this container. <a href="#fix-path">Fix</a></td></tr>
+  <tr><td><code>Failed to load extension from …</code></td><td>The <code>.supx</code> is damaged or not ours: rebuild it.</td></tr>
+  <tr><td><code>AI Assistant backend loaded: …</code></td><td>The plugin's backend started, with the settings it read.</td></tr>
+  <tr><td>none of these</td><td>Extensions are off, or this pod started before the log you're looking at. <a href="#fix-flag">Fix</a></td></tr>
+</table>
+<p class="muted" data-for="k8s">This reads one pod. With several, check each: <code>kubectl get pods</code>, then <code>kubectl logs &lt;pod&gt;</code>.</p>
+
+<h2 id="fixes">Fixes</h2>
+
+<h3 id="fix-flag">Turn extensions on</h3>
+<p>Superset needs <code>"ENABLE_EXTENSIONS": True</code> in <code>FEATURE_FLAGS</code> and <code>EXTENSIONS_PATH</code>
+set, in the config it actually reads (check 2's first line names it).</p>
+<div data-for="k8s">
+<p>With the Helm chart, put them in the values' <code>configOverrides</code>. The chart adds each entry to the
+<code>superset_config.py</code> it writes, so this keeps any feature flags set earlier:</p>
+<div class="block"><pre>configOverrides:
+  extensions: |
+    FEATURE_FLAGS = {**globals().get("FEATURE_FLAGS", {}), "ENABLE_EXTENSIONS": True}
+    EXTENSIONS_PATH = "/the/folder/holding/the/supx"</pre></div>
+<p class="warn">Don't paste the top of <code>deploy/superset_config_docker.py</code> into the Helm values: its
+<code>from superset_config import FEATURE_FLAGS</code> and its <code>EXTENSIONS_PATH</code> are for Superset's
+docker compose. Copy its <code>NLSQL_*</code> lines.</p>
+</div>
+<p data-for="compose" hidden>With Superset's docker compose, <code>deploy/superset_config_docker.py</code> goes in
+<code>docker/pythonpath_dev/</code>. If it fails to import, Superset says <code>Using default Docker config</code>
+in the log and carries on without it.</p>
+<p>Then restart:</p>
+<div class="block"><pre id="restart-command"></pre></div>
+
+<h3 id="fix-path">Put the .supx where Superset looks</h3>
+<p>Superset loads every <code>*.supx</code> in <code>EXTENSIONS_PATH</code>, inside the container, at start-up.
+Check 2 lists what's there. Either put the file in that folder, or point <code>EXTENSIONS_PATH</code> at where it
+is, then restart (above).</p>
+
+<h3 id="fix-old">Replace an old .supx</h3>
+<p>If check 2's build isn't the one from step 0, the container has an old file. Copy the new one in and restart.
+Superset reads the <code>.supx</code> only at start-up, so copying it in isn't enough on its own.</p>
+<p data-for="k8s">If the <code>.supx</code> is baked into an image: a new image pushed under the same tag isn't
+pulled when <code>imagePullPolicy</code> is <code>IfNotPresent</code>. Use a new tag, or set it to
+<code>Always</code> and restart.</p>
+
+<h3 id="fix-superset-roles">Let the role load extensions</h3>
+<p>This is Superset's check, before the plugin runs. The user needs a role with <b>can get list</b> and
+<b>can content</b> on <b>ExtensionsRestApi</b>. Gamma, Alpha and Admin have them; <code>sql_lab</code> on its own
+doesn't. Add them in Settings → List Roles → edit the role → Permissions. Without them the console shows
+<code>Error setting up extensions</code> with a 403 on <code>/api/v1/extensions/</code>.</p>
+
+<h3 id="fix-panel-roles">Give the panel permission</h3>
+<p>The plugin shows its panel to users with any permission on <code>nltosqlandback</code>. Gamma, Alpha and Admin
+get them from <code>superset init</code>. For another role, add one, such as <b>can generate sql on
+nltosqlandback</b>, in Settings → List Roles. Or build the <code>.supx</code> with
+<code>NLSQL_IGNORE_ROLES=true</code> to show it to everyone.</p>
+
+<h3 id="fix-settings">Our settings aren't read</h3>
+<p>If check 2's plugin line shows the defaults (<code>key not set</code>, <code>structure read per_table</code>,
+<code>dictionary none</code>) where you set something, the <code>NLSQL_*</code> lines aren't in the config file
+Superset reads. Put them there (<a href="#fix-flag">as above</a>) and restart.</p>
+
+<h3 id="fix-sidebar">Open the sidebar</h3>
+<p>The panel lives in SQL Lab's right-hand sidebar, which can be collapsed. Look for its toggle at the right edge.</p>
+</main>
+
+<script type="text/plain" id="browser-check">
+await (async () => {
+  const boot = JSON.parse(document.getElementById('app')?.dataset.bootstrap || '{}');
+  const roles = boot.user?.roles || {};
+  const rolesWith = test => Object.keys(roles).filter(role => roles[role].some(([perm, view]) => test(perm, view)));
+  const r = {
+    page: location.pathname,
+    superset: boot.common?.menu_data?.navbar_right?.version_string,
+    user: boot.user?.username,
+    roles: Object.keys(roles),
+    extensionsOn: boot.common?.feature_flags?.ENABLE_EXTENSIONS,
+    rolesThatCanListExtensions: rolesWith((perm, view) => perm === 'can_get_list' && view === 'ExtensionsRestApi'),
+    rolesThatCanFetchExtensionFiles: rolesWith((perm, view) => perm === 'can_content' && view === 'ExtensionsRestApi'),
+    rolesWithAPanelPermission: rolesWith((perm, view) => view === 'nltosqlandback'),
+    plugin: window.nltosqlandback ?? 'not running',
+  };
+  let ours;
+  try {
+    const res = await fetch('/api/v1/extensions/');
+    r.extensionsApi = res.status;
+    if (res.ok) {
+      const list = (await res.json()).result || [];
+      r.extensions = list.map(e => `${e.id} ${e.version} ${e.remoteEntry}`);
+      ours = list.find(e => e.id === 'waxwing.nltosqlandback');
+      if (ours?.remoteEntry) r.bundle = (await fetch(ours.remoteEntry)).status;
+    }
+  } catch (e) {
+    r.extensionsApi = String(e);
+  }
+  r.answer =
+    !boot.user ? 'Run this on a Superset page, signed in: SQL Lab.' :
+    !r.extensionsOn ? 'ENABLE_EXTENSIONS is off: Superset isn\'t reading the config that turns it on. See "Turn extensions on".' :
+    r.extensionsApi === 403 ? 'None of your roles can list extensions, so Superset loads none for you. See "Let the role load extensions".' :
+    r.extensionsApi !== 200 ? `Superset's extensions API answered ${r.extensionsApi}: see check 3, the log.` :
+    !ours ? 'Superset loaded no copy of the plugin. Run check 2 and see "Put the .supx where Superset looks".' :
+    !ours.remoteEntry ? 'Superset loaded the plugin, but its .supx has no frontend: the frontend build failed when it was bundled. See step 0.' :
+    r.bundle !== 200 ? `The plugin's bundle didn't download (${r.bundle}). See "Let the role load extensions", then the log.` :
+    r.plugin === 'not running' ? 'Superset has the plugin and its bundle downloads, but no code from this version ran: an older .supx, or it failed (look for red errors above). See "Replace an old .supx".' :
+    !r.plugin.shown ? `The plugin runs, build ${r.plugin.build}, but: ${r.plugin.why}. See "Give the panel permission".` :
+    `The panel should be in SQL Lab's right sidebar. Build ${r.plugin.build}: check it matches step 0.`;
+  const text = JSON.stringify(r, null, 2);
+  try { copy(text); } catch {}
+  console.log(text);
+  return r.answer;
+})()
+</script>
+
+<script type="text/plain" id="server-check">
+import glob, json, os, re, zipfile
+from datetime import datetime, timezone
+
+from superset.app import create_app
+
+BUILD = re.compile(r"(?:[0-9a-f]{7,}|unknown commit)(?: with local changes)?, built \d{4}-\d\d-\d\dT\d\d:\d\dZ")
+
+app = create_app()
+with app.app_context():
+    from superset import security_manager
+    from superset.extensions import feature_flag_manager
+    from superset.extensions.utils import get_extensions
+
+    cfg = app.config
+    print("== Config")
+    print("config file:", os.environ.get("SUPERSET_CONFIG_PATH") or "superset_config on PYTHONPATH")
+    print("ENABLE_EXTENSIONS:", feature_flag_manager.is_feature_enabled("ENABLE_EXTENSIONS"))
+    path = cfg.get("EXTENSIONS_PATH")
+    print("EXTENSIONS_PATH:", path, "" if not path else "(exists)" if os.path.isdir(path) else "(NO SUCH FOLDER)")
+    if cfg.get("LOCAL_EXTENSIONS"):
+        print("LOCAL_EXTENSIONS:", cfg["LOCAL_EXTENSIONS"])
+
+    print("== .supx files in EXTENSIONS_PATH")
+    files = sorted(glob.glob(os.path.join(path, "*.supx"))) if path else []
+    if not files:
+        print("none")
+    for supx in files:
+        copied = datetime.fromtimestamp(os.path.getmtime(supx), timezone.utc).strftime("%Y-%m-%d %H:%MZ")
+        try:
+            with zipfile.ZipFile(supx) as z:
+                manifest = json.loads(z.read("manifest.json"))
+                entry = [n.rsplit("/", 1)[-1] for n in z.namelist() if "remoteEntry" in n]
+                labels = (BUILD.search(z.read(n).decode("utf-8", "ignore")) for n in z.namelist() if n.endswith(".js"))
+                build = next((m.group(0) for m in labels if m), "none (built before these checks existed)")
+                if not entry:
+                    entry, build = ["NO FRONTEND (its build failed when bundling)"], "none"
+            print(f"{os.path.basename(supx)}: {manifest.get('id')} {manifest.get('version')}, copied {copied}, "
+                  f"{', '.join(entry)}, build {build}")
+        except Exception as ex:
+            print(f"{os.path.basename(supx)}: can't read it ({type(ex).__name__}: {ex})")
+
+    print("== Loaded by Superset")
+    try:
+        print(", ".join(get_extensions()) or "none")
+    except Exception as ex:
+        print(f"can't list them ({type(ex).__name__}: {ex})")
+
+    print("== Plugin backend")
+    try:
+        from waxwing.nltosqlandback import settings_report
+        print(settings_report.summary())
+    except Exception as ex:
+        print(f"not loaded ({type(ex).__name__}: {ex})")
+
+    print("== Roles: can list extensions / can fetch their files / permissions on nltosqlandback (the panel)")
+    for role in sorted(security_manager.get_all_roles(), key=lambda r: r.name):
+        pairs = {(p.permission.name, p.view_menu.name) for p in role.permissions if p.permission and p.view_menu}
+        listing = ("can_get_list", "ExtensionsRestApi") in pairs
+        files_ok = ("can_content", "ExtensionsRestApi") in pairs
+        panel = sum(1 for _, view in pairs if view == "nltosqlandback")
+        print(f"{role.name}: {'yes' if listing else 'NO'} / {'yes' if files_ok else 'NO'} / {panel}")
+</script>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const fields = ['runs-on', 'ns', 'deploy', 'service'];
+  const store = {
+    get() { try { return JSON.parse(localStorage.getItem('nlsql-troubleshoot') || '{}'); } catch { return {}; } },
+    set(v) { try { localStorage.setItem('nlsql-troubleshoot', JSON.stringify(v)); } catch {} },
+  };
+  const saved = store.get();
+  const defaults = { 'runs-on': 'k8s', ns: '', deploy: 'superset', service: 'superset' };
+  fields.forEach(f => { $(f).value = saved[f] ?? defaults[f]; });
+
+  const text = id => $(id).textContent.replace(/^\n/, '').replace(/\s+$/, '');
+  $('browser-check-shown').textContent = text('browser-check');
+
+  function render() {
+    const v = Object.fromEntries(fields.map(f => [f, $(f).value.trim()]));
+    store.set(v);
+    const k8s = v['runs-on'] === 'k8s';
+    document.querySelectorAll('[data-for]').forEach(el => { el.hidden = (el.dataset.for === 'k8s') !== k8s; });
+    const kubectl = `kubectl${v.ns ? ` -n ${v.ns}` : ''}`;
+    const deploy = `deploy/${v.deploy || 'superset'}`;
+    const service = v.service || 'superset';
+    const exec = k8s ? `${kubectl} exec -i ${deploy} --` : `docker compose exec -T ${service}`;
+    $('server-command').textContent = `${exec} python - 2>/dev/null <<'EOF'\n${text('server-check')}\nEOF`;
+    const lines = `grep -E "Loaded extension|Extensions path|Failed to load extension|Error discovering extensions|AI Assistant backend loaded"`;
+    $('log-command').textContent = k8s ? `${kubectl} logs ${deploy} | ${lines}` : `docker compose logs ${service} | ${lines}`;
+    $('restart-command').textContent = k8s ? `${kubectl} rollout restart ${deploy}` : `docker compose restart ${service}`;
+  }
+  fields.forEach(f => $(f).addEventListener('input', render));
+  render();
+
+  async function copyText(t) {
+    try { await navigator.clipboard.writeText(t); return; } catch {}
+    const area = Object.assign(document.createElement('textarea'), { value: t });
+    document.body.append(area); area.select(); document.execCommand('copy'); area.remove();
+  }
+  document.querySelectorAll('.block').forEach(block => {
+    const button = Object.assign(document.createElement('button'), { type: 'button', textContent: 'Copy' });
+    button.addEventListener('click', async () => {
+      await copyText(block.querySelector('pre').textContent);
+      button.textContent = 'Copied';
+      setTimeout(() => { button.textContent = 'Copy'; }, 1500);
+    });
+    block.append(button);
+  });
+</script>
+</body>
+</html>

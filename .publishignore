@@ -1,0 +1,4 @@
+.github/
+e2e/
+/llm-eval-suite/dev/
+/claude-e2e

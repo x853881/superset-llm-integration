@@ -1,0 +1,136 @@
+[
+  {
+    "name": "accelerate_count_of_nothing_is_zero",
+    "input": "SELECT c.country,\n  (SELECT COUNT(DISTINCT g.week)\n     FROM acled.global_events g\n    WHERE upper(g.country) = upper(c.country)\n      AND g.event_type ILIKE 'battles'\n      AND EXTRACT(YEAR FROM g.week) = 2025) AS battle_weeks\nFROM acled.countries c\nWHERE c.region LIKE '%Africa'\n  AND (SELECT COUNT(DISTINCT g.week)\n         FROM acled.global_events g\n        WHERE upper(g.country) = upper(c.country)\n          AND g.event_type ILIKE 'battles'\n          AND EXTRACT(YEAR FROM g.week) = 2025) < 10",
+    "additional_metadata": {
+      "endpoint": "accelerate",
+      "notes": "African countries with fewer than 10 weeks of battles in 2025, and how many weeks they had, with the same correlated COUNT(DISTINCT week) in the SELECT list and the WHERE. upper() on country, ILIKE on event_type and EXTRACT() on week stop the indexes being used, so each of the 58 countries scans the whole weekly table, twice for those that qualify: 17.2s when timed. Counting weeks once per country, LEFT JOINed from countries, with COALESCE(..., 0) in both the SELECT and the filter, runs in milliseconds with identical results (37 rows). Traps: a correlated COUNT over no rows is 0, but after a LEFT JOIN to grouped counts it is NULL, and NULL < 10 is never true: without COALESCE in the filter the 23 countries with no battles in 2025 drop out (14 rows), and without it in the SELECT they show NULL instead of 0. A country has several rows a week (one per admin1 and sub-event type), so COUNT(*) instead of COUNT(DISTINCT week) counts rows, not weeks: one country's total changes and it drops out (36 rows). ILIKE 'battles' matches only 'Battles' in this data, so = 'Battles' is fine."
+    }
+  },
+  {
+    "name": "accelerate_fanout_distinct_countries",
+    "input": "SELECT DISTINCT c.region, g.country\nFROM acled.global_events g\nJOIN acled.countries c ON c.country = g.country\nJOIN acled.political_violence_country_month p ON p.country = g.country\nWHERE p.events > 500",
+    "additional_metadata": {
+      "endpoint": "accelerate",
+      "notes": "Joins a million weekly rows to monthly rows then collapses them with DISTINCT: cost ~39k vs ~380 with EXISTS checks from countries.",
+      "regression": true
+    }
+  },
+  {
+    "name": "accelerate_semi_join_must_not_fan_out",
+    "input": "SELECT c.country,\n  (SELECT SUM(g.fatalities)\n   FROM acled.global_events g\n   WHERE upper(g.country) = upper(c.country)\n     AND EXTRACT(YEAR FROM g.week) = 2024) AS fatalities_2024\nFROM acled.countries c\nWHERE c.country IN (\n  SELECT p.country\n  FROM acled.political_violence_country_month p\n  WHERE p.year = 2024 AND p.events > 200\n)",
+    "additional_metadata": {
+      "endpoint": "accelerate",
+      "notes": "2024 fatalities for the 22 countries that had a month with more than 200 political violence events. upper() on country and EXTRACT() on week stop the indexes being used, so the correlated subquery scans the whole weekly table for each of the 22 countries: 1.5s when timed. Totalling 2024 once by country with a week range, LEFT JOINed from countries, and keeping the IN (or an EXISTS) for the month condition runs in 0.03s with identical results (22 rows). Trap: the IN is a semi-join, so a country counts once however many of its months qualify. Rewriting it as a JOIN to the monthly table repeats each country once per qualifying month (224 rows), and totalling after that join multiplies each total by its months: Ukraine's 73,644 becomes 883,728 (12 months), and 21 of the 22 totals change (only Bangladesh, with one such month, doesn't)."
+    }
+  },
+  {
+    "name": "accelerate_keep_preaggregation_in_cte",
+    "input": "WITH per_country AS (\n  SELECT c.country, c.region,\n    COALESCE((SELECT SUM(g.events) FROM acled.global_events g\n     WHERE g.country = c.country AND g.event_type = 'Protests'\n       AND EXTRACT(YEAR FROM g.week) = 2024), 0) AS protests,\n    COALESCE((SELECT SUM(g.events) FROM acled.global_events g\n     WHERE g.country = c.country AND g.event_type = 'Battles'\n       AND EXTRACT(YEAR FROM g.week) = 2024), 0) AS battles\n  FROM acled.countries c\n)\nSELECT region, SUM(protests) AS protests, SUM(battles) AS battles\nFROM per_country\nGROUP BY region",
+    "additional_metadata": {
+      "endpoint": "accelerate",
+      "regression": true,
+      "notes": "Two correlated subqueries per country, with COALESCE so a country with none counts 0. One pass with SUM(...) FILTER per country, LEFT JOINed from countries, is several times faster. Traps: joining the protest rows and battle rows of global_events to each other before totalling multiplies both sums; an inner join drops the group of 7 countries with no region, which had no events (18 rows, not 19). After a LEFT JOIN that group shows NULL where the original has 0 unless the totals are COALESCEd; SQL Result Match counts NULL and 0 as the same, so either passes. accelerate_rate_stays_null_without_battles is the opposite case, where NULL is the right answer."
+    }
+  },
+  {
+    "name": "accelerate_rolling_12_week_totals",
+    "input": "SELECT g.country, g.admin1, g.event_type, g.week,\n  (SELECT SUM(g2.events)\n     FROM acled.global_events g2\n    WHERE lower(g2.country) = lower(g.country)\n      AND coalesce(g2.admin1, '') = coalesce(g.admin1, '')\n      AND g2.event_type || '' = g.event_type\n      AND g2.week BETWEEN g.week - 77 AND g.week) AS events_12w,\n  (SELECT SUM(g3.fatalities)\n     FROM acled.global_events g3\n    WHERE lower(g3.country) = lower(g.country)\n      AND coalesce(g3.admin1, '') = coalesce(g.admin1, '')\n      AND g3.event_type || '' = g.event_type\n      AND g3.week BETWEEN g.week - 77 AND g.week) AS fatalities_12w\nFROM acled.global_events g\nWHERE g.week >= DATE '2026-10-03'",
+    "additional_metadata": {
+      "endpoint": "accelerate",
+      "notes": "Rolling 12-week totals per region and event type, written as two correlated subqueries per row. lower(), coalesce() and || '' on the compared columns stop the indexes being used, so each of the 3,217 rows scans the whole table twice: 17.4s when timed. One window, SUM(...) OVER (PARTITION BY lower(country), coalesce(admin1, ''), event_type ORDER BY week RANGE BETWEEN INTERVAL '77 days' PRECEDING AND CURRENT ROW), over the weeks from 77 days before the cut-off, then filtered to the cut-off, runs in 0.1s with identical results (3,217 rows). A self-join with GROUP BY on each row (e.g. ctid) is also correct, in about 5s. Trap: windowing only the filtered weeks loses the 11 earlier weeks each total needs."
+    }
+  },
+  {
+    "name": "accelerate_regions_where_no_country_doubled",
+    "input": "SELECT r.region\nFROM (SELECT DISTINCT region FROM acled.countries) r\nWHERE NOT EXISTS (\n  SELECT 1\n  FROM acled.countries c\n  WHERE c.region = r.region\n    AND (SELECT SUM(g.fatalities)\n           FROM acled.global_events g\n          WHERE upper(g.country) = upper(c.country)\n            AND g.event_type ILIKE 'battles'\n            AND EXTRACT(YEAR FROM g.week) = 2025)\n      > 2 * (SELECT SUM(g.fatalities)\n               FROM acled.global_events g\n              WHERE upper(g.country) = upper(c.country)\n                AND g.event_type ILIKE 'battles'\n                AND EXTRACT(YEAR FROM g.week) = 2024)\n)",
+    "additional_metadata": {
+      "endpoint": "accelerate",
+      "execute": false,
+      "notes": "Regions where no country's battle deaths more than doubled from 2024 to 2025, as NOT EXISTS over two correlated SUMs per country. upper() on country, ILIKE on event_type and EXTRACT() on week stop the indexes being used, so every country scans the whole weekly table twice: 92s when timed, so its result is recorded (execute: false). Totalling 2024 and 2025 once per country (SUM ... FILTER) and keeping the NOT EXISTS, or SELECT region FROM countries EXCEPT the regions with a country that doubled, runs in milliseconds with identical results (10 rows: Antarctica, Caribbean, Caucasus and Central Asia, East Asia, Europe, Oceania, South America, South Asia, Southern Africa and the group with no region). Three NULL traps, each changing the result: (1) a country with battles in only one of the years has a NULL sum, so its comparison is NULL and it never counts as doubled; COALESCE(..., 0) makes every country whose battles began in 2025 count as doubled (6 rows). (2) the 7 countries with no region: c.region = r.region never matches NULL, so that group always qualifies; region NOT IN (the regions with a country that doubled) is NULL for it and drops it (9 rows). (3) GROUP BY region HAVING NOT bool_or(...) gets NULL for a region where no country had battles in both years, and drops it: Antarctica, East Asia, Oceania, Southern Africa and the no-region group go (5 rows).",
+      "expected_result": {
+        "row_count": 10,
+        "checksum": "7e6f2df332209af4c716fb91f07122f6",
+        "tables": {
+          "acled.countries": 251,
+          "acled.global_events": 1001577
+        },
+        "original_ms": 92395.1,
+        "recorded": "2026-11-04"
+      }
+    }
+  },
+  {
+    "name": "accelerate_top3_weeks_per_country",
+    "input": "SELECT g.country, g.admin1, g.week, g.fatalities\nFROM acled.global_events g\nWHERE g.week >= DATE '2024-01-01' AND g.week < DATE '2026-01-01'\n  AND g.fatalities > 0\n  AND (SELECT COUNT(*)\n         FROM acled.global_events g2\n        WHERE g2.country = g.country\n          AND g2.week >= DATE '2024-01-01' AND g2.week < DATE '2026-01-01'\n          AND g2.fatalities > g.fatalities) < 3\nORDER BY g.country, g.fatalities DESC",
+    "additional_metadata": {
+      "endpoint": "accelerate",
+      "regression": true,
+      "notes": "Each country's 3 deadliest weeks in 2024-2025, found by counting, for every week with deaths, how many of the country's weeks had more: 10.5s when timed. RANK() OVER (PARTITION BY country ORDER BY fatalities DESC) <= 3 runs in 0.1s with identical results (556 rows). Trap: it must be RANK, not ROW_NUMBER: the count keeps every week tied for a place, so a country can have more than 3 rows."
+    }
+  },
+  {
+    "name": "accelerate_first_week_of_event_type",
+    "input": "SELECT g.country, g.admin1, g.event_type, g.week AS first_week, g.events\nFROM acled.global_events g\nWHERE g.week = (\n  SELECT MIN(g2.week)\n  FROM acled.global_events g2\n  WHERE g2.country = g.country\n    AND g2.admin1 = g.admin1\n    AND g2.event_type = g.event_type\n)\nAND g.week >= DATE '2026-04-01'",
+    "additional_metadata": {
+      "endpoint": "accelerate",
+      "notes": "Region and event-type combinations seen for the first time since April 2026, found with a correlated MIN(week) per row of the window: 16.0s when timed. MIN(week) per country, admin1 and event_type computed once (HAVING it is in range) and joined back runs in 0.3s with identical results (138 rows). Trap: the original drops rows with a NULL admin1 (= never matches NULL), and there is one in range; MIN() OVER (PARTITION BY country, admin1, event_type) would keep it. Every row of the first week is kept, not one per combination."
+    }
+  },
+  {
+    "name": "accelerate_count_star_after_left_join",
+    "input": "SELECT c.country,\n  (SELECT COUNT(*)\n     FROM acled.global_events g\n    WHERE upper(g.country) = upper(c.country)\n      AND g.event_type ILIKE 'explosions/remote violence'\n      AND g.fatalities > 0\n      AND EXTRACT(YEAR FROM g.week) = 2025) AS deadly_records\nFROM acled.countries c\nWHERE c.region = 'Western Africa'\nORDER BY c.country",
+    "additional_metadata": {
+      "endpoint": "accelerate",
+      "notes": "For every Western African country, how many of its weekly records in 2025 were explosions or remote violence with at least one death: 0 for a country with none is the answer the user wants. upper() on country, ILIKE on event_type and EXTRACT() on week stop the indexes being used, so each of the 16 countries scans the whole weekly table: 3.9s when timed. A LEFT JOIN from countries with the filters in the ON clause and a range on week, counting COUNT(g.country), runs in 6 ms with identical results (16 rows; 10 countries have 0). Totalling per country first and LEFT JOINing the totals is also right: those countries show NULL, which SQL Result Match counts as 0. Trap: COUNT(*) after the LEFT JOIN counts the NULL row a country with no match still gets, so all 10 show 1 instead of 0; an inner join drops them (6 rows). Replaces accelerate_not_in_with_null_admin1, whose original relied on a NOT IN NULL rule the user almost certainly didn't mean: here the original does exactly what it says, and the usual rewrite changes its numbers."
+    }
+  },
+  {
+    "name": "accelerate_greater_than_all_of_nothing",
+    "input": "SELECT g.country, g.admin1, g.week, g.sub_event_type, g.fatalities\nFROM acled.global_events g\nWHERE g.event_type = 'Battles'\n  AND g.week >= DATE '2026-01-01'\n  AND g.fatalities >= 30\n  AND g.fatalities > ALL (\n    SELECT g2.fatalities\n    FROM acled.global_events g2\n    WHERE g2.country || '' = g.country\n      AND g2.admin1 || '' = g.admin1\n      AND g2.event_type || '' = 'Battles'\n      AND EXTRACT(YEAR FROM g2.week) = 2025\n  )",
+    "additional_metadata": {
+      "endpoint": "accelerate",
+      "notes": "Battle rows of 2026 with 30 or more deaths that were deadlier than every battle row of the same admin1 area in 2025, using > ALL. || '' on country, admin1 and event_type (not upper(), which would make case part of the meaning) and EXTRACT() on week stop the indexes being used, so each of the 545 candidate rows scans the whole weekly table: 9.2s when timed. The 2025 maximum per country and admin1 computed once, LEFT JOINed, keeping rows where it IS NULL OR fatalities > it, runs in milliseconds with identical results (127 rows); NOT EXISTS (... g2.fatalities >= g.fatalities) is also correct, as fatalities is never NULL. Trap: > ALL over no rows is true, but > (SELECT MAX(...)) over no rows compares with NULL and is never true, and an inner join to the maxima drops those rows the same way: 4 rows go (Mali's Bamako, Niger's Niamey twice, Somalia's Middle Juba, areas with no battles in 2025), leaving 123. The same goes for a MAX window over 2025 only. The admin1 match is =, so a NULL admin1 never matches anything; no candidate row has a NULL admin1 in this data, so IS NOT DISTINCT FROM gives the same rows here."
+    }
+  },
+  {
+    "name": "accelerate_already_fast",
+    "input": "SELECT week, SUM(events) AS events\nFROM acled.global_events\nWHERE country = 'Kenya'\n  AND week >= DATE '2025-01-01' AND week < DATE '2026-01-01'\nGROUP BY week\nORDER BY week",
+    "additional_metadata": {
+      "endpoint": "accelerate",
+      "already_fast": true,
+      "notes": "Already efficient: a range scan on the (country, week) index, under a millisecond (52 rows). The plugin is told to return such a query unchanged and say so, with what would help (an index, statistics). Passes if the rewrite returns the same rows and isn't meaningfully slower than the original; an unchanged query passes. Fails if it changes the rows or slows the query down; read its explanation in the report to see whether it said the query was already fast."
+    }
+  },
+  {
+    "name": "accelerate_ucdp_per_country_year_to_summary",
+    "input": "SELECT ci.country, y.year,\n  (SELECT SUM(g.best) FROM ucdp.ucdp_ged g\n    WHERE g.country_id = ci.gw_code AND EXTRACT(YEAR FROM g.date_start) = y.year) AS deaths,\n  (SELECT COUNT(*) FROM ucdp.ucdp_ged g\n    WHERE g.country_id = ci.gw_code AND EXTRACT(YEAR FROM g.date_start) = y.year\n      AND g.type_of_violence = 3) AS one_sided_events\nFROM geo.country_info ci\nCROSS JOIN generate_series(2015, 2024) AS y(year)\nWHERE ci.gw_code IS NOT NULL\nORDER BY ci.country, y.year",
+    "additional_metadata": {
+      "endpoint": "accelerate",
+      "must_use": [
+        "ucdp_country_year"
+      ],
+      "waiting_on_plugin": true,
+      "notes": "Deaths and one-sided violence events for each UCDP country and year 2015-2024, as two correlated subqueries per country-year with EXTRACT(YEAR ...) on date_start: 3.6s when timed. The materialized view ucdp_country_year has these totals already (1,260 rows in 5 ms). Tests whether the rewrite reads it: fails if it doesn't. Trap: an inner join drops the empty country-years. A country-year with no events has NULL deaths but 0 events in the original; SQL Result Match counts NULL and 0 as the same, so COALESCE on deaths is fine. Waiting on the plugin (5 November): in production the plugin will be told which tables are rollups or faster than the raw tables, but it isn't yet, and that metadata shouldn't be given before then. Until it is, the plugin sees ucdp_country_year as a view with no row estimate and no indexes, so only the name says it holds these totals, and nothing says deaths need summing across type_of_violence. Expect failures until then."
+    }
+  },
+  {
+    "name": "accelerate_sanctions_unnest_per_country",
+    "input": "SELECT c.country,\n  (SELECT COUNT(*) FROM opensanctions_public.os_targets t\n    WHERE lower(c.iso2) = ANY(string_to_array(t.countries, ';'))\n      AND t.schema = 'Person') AS sanctioned_people\nFROM acled.countries c\nWHERE c.region LIKE '%Africa'\nORDER BY c.country",
+    "additional_metadata": {
+      "endpoint": "accelerate",
+      "notes": "Sanctioned people per African country, splitting os_targets.countries (a ;-separated list) for each of 1.2 million targets, once per country: 12.7s for 58 countries. Two faster routes give the same rows: the child table os_target_countries (indexed on country_code, 0.3s) or the optimised copy os_country_counts (1 ms). Either passes; os_country_counts is right here because each row is one country. Countries with none must stay in with 0."
+    }
+  },
+  {
+    "name": "accelerate_wdi_wide_to_long",
+    "input": "SELECT f.country, f.year, f.fatalities,\n  round(f.fatalities * 100000.0 / (\n    SELECT CASE f.year WHEN 2019 THEN w.y2019 WHEN 2020 THEN w.y2020 WHEN 2021 THEN w.y2021\n                       WHEN 2022 THEN w.y2022 WHEN 2023 THEN w.y2023 WHEN 2024 THEN w.y2024 END\n      FROM wdi.wdi_wide w\n     WHERE w.country_code = c.iso3 AND lower(w.indicator_code) = 'sp.pop.totl')::numeric, 2) AS per_100k\nFROM acled.reported_fatalities f\nJOIN acled.countries c ON c.country = f.country\nWHERE f.year BETWEEN 2019 AND 2024\nORDER BY f.country, f.year",
+    "additional_metadata": {
+      "endpoint": "accelerate",
+      "must_use": [
+        "wdi"
+      ],
+      "notes": "ACLED fatalities per 100,000 people for each country and year 2019-2024, looking up population in wdi_wide (one column per year, 1,498 indicators per country) with lower() on indicator_code, once per country-year: 0.47s. wdi.wdi has population unpivoted, keyed on (iso3, indicator_code, year): one LEFT JOIN, 30 ms. Fails if the rewrite doesn't read wdi.wdi. Country-years without a population must keep a NULL rate."
+    }
+  }
+]

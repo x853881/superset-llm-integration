@@ -1,0 +1,93 @@
+[
+  {
+    "name": "update_description_after_battles_filter",
+    "input": "SELECT country, SUM(fatalities) AS fatalities FROM acled.global_events WHERE week >= DATE '2024-01-01' AND week < DATE '2025-01-01' AND event_type = 'Battles' GROUP BY country ORDER BY fatalities DESC",
+    "additional_metadata": {
+      "endpoint": "update-nl-from-sql-diff",
+      "previous_input": "Total fatalities per country in 2024 from the weekly event data, highest first.",
+      "previous_sql": "SELECT country, SUM(fatalities) AS fatalities FROM acled.global_events WHERE week >= DATE '2024-01-01' AND week < DATE '2025-01-01' GROUP BY country ORDER BY fatalities DESC",
+      "regression": true
+    }
+  },
+  {
+    "name": "update_description_ratio_to_integer_division",
+    "input": "SELECT country, SUM(events) AS battles, SUM(fatalities) AS fatalities,\n  SUM(fatalities) / SUM(events) AS fatalities_per_battle\nFROM acled.global_events\nWHERE event_type = 'Battles'\n  AND EXTRACT(YEAR FROM week) = 2025\nGROUP BY country\nHAVING SUM(events) >= 100\nORDER BY fatalities_per_battle DESC",
+    "additional_metadata": {
+      "endpoint": "update-nl-from-sql-diff",
+      "previous_input": "Battles, battle fatalities and fatalities per battle (to two decimal places) in 2025 for each country with at least 100 battles, highest fatalities per battle first.",
+      "previous_sql": "SELECT country, SUM(events) AS battles, SUM(fatalities) AS fatalities,\n  ROUND(1.0 * SUM(fatalities) / SUM(events), 2) AS fatalities_per_battle\nFROM acled.global_events\nWHERE event_type = 'Battles'\n  AND week >= DATE '2025-01-01' AND week < DATE '2026-01-01'\nGROUP BY country\nHAVING SUM(events) >= 100\nORDER BY fatalities_per_battle DESC",
+      "notes": "Two edits, one of which changes nothing. The 1.0 * and the ROUND were removed, so both sides of the division are integers and Postgres does integer division: fatalities per battle is now a whole number, rounded down, not a value to two decimal places. The same 38 countries with the same battles and fatalities, but 37 of 38 ratios change (Sudan 6.67 becomes 6, Syria 1.94 becomes 1) and 10 become 0 (Mexico and Yemen 0.92, Brazil 0.89; only Armenia, 0.00, stays the same); the many ties now leave the order within them arbitrary (Niger 4.53 was above Burkina Faso 4.45, now both are 4). The date filter was rewritten as EXTRACT(YEAR FROM week) = 2025, which picks the same 108,649 records, so the year must not change. The description must say fatalities per battle is rounded down to a whole number; one that only drops 'to two decimal places', or that says it is no longer rounded, is wrong."
+    }
+  },
+  {
+    "name": "update_description_window_includes_current_week",
+    "input": "WITH weekly AS (\n  SELECT country, week, SUM(events) AS events\n  FROM acled.global_events\n  WHERE region = 'Middle East'\n    AND week >= DATE '2025-01-01'\n  GROUP BY country, week\n),\nwith_prior AS (\n  SELECT country, week, events,\n    AVG(events) OVER (\n      PARTITION BY country ORDER BY week\n      ROWS BETWEEN 3 PRECEDING AND CURRENT ROW\n    ) AS prior_avg\n  FROM weekly\n)\nSELECT country, week, events, ROUND(prior_avg, 1) AS prior_avg\nFROM with_prior\nWHERE events > 2 * prior_avg\nORDER BY country, week",
+    "additional_metadata": {
+      "endpoint": "update-nl-from-sql-diff",
+      "previous_input": "Weeks since the start of 2025 in which a Middle East country had more than twice the average of its previous three weeks with events.",
+      "previous_sql": "WITH weekly AS (\n  SELECT country, week, SUM(events) AS events\n  FROM acled.global_events\n  WHERE region = 'Middle East'\n    AND week >= DATE '2025-01-01'\n  GROUP BY country, week\n),\nwith_prior AS (\n  SELECT country, week, events,\n    AVG(events) OVER (\n      PARTITION BY country ORDER BY week\n      ROWS BETWEEN 3 PRECEDING AND 1 PRECEDING\n    ) AS prior_avg\n  FROM weekly\n)\nSELECT country, week, events, ROUND(prior_avg, 1) AS prior_avg\nFROM with_prior\nWHERE events > 2 * prior_avg\nORDER BY country, week",
+      "notes": "One window bound changed: 1 PRECEDING became CURRENT ROW, so each week is now compared with the average of itself and the three before it, not of the three before it (rows of weekly: weeks with events, as a week with none has no row). A spike has to be bigger to count: 29 rows instead of 61, none of them the same. The alias prior_avg didn't change, so the column name gives nothing away. The description must say the average includes that week."
+    }
+  },
+  {
+    "name": "update_description_avg_of_weekly_totals",
+    "input": "SELECT country, AVG(fatalities) AS avg_fatalities\nFROM (\n  SELECT country, week, SUM(fatalities) AS fatalities\n  FROM acled.global_events\n  WHERE event_type = 'Battles'\n    AND week >= DATE '2025-01-01' AND week < DATE '2026-01-01'\n  GROUP BY country, week\n) weekly\nGROUP BY country\nORDER BY avg_fatalities DESC",
+    "additional_metadata": {
+      "endpoint": "update-nl-from-sql-diff",
+      "previous_input": "Average battle fatalities per weekly record (one for each area and week) for each country in 2025, highest first.",
+      "previous_sql": "SELECT country, AVG(fatalities) AS avg_fatalities\nFROM acled.global_events\nWHERE event_type = 'Battles'\n  AND week >= DATE '2025-01-01' AND week < DATE '2026-01-01'\nGROUP BY country\nORDER BY avg_fatalities DESC",
+      "notes": "The records are now added up per week before averaging, in a subquery: it is the average of each week's total battle fatalities, over the weeks with battles, not the average per area and week. Same output column and outer query, different measure: 50 of 88 averages change (Ukraine 125.74 per record becomes 1,240.46 per week; Sudan 19.29 becomes 165.81). The description must say weekly totals, not records."
+    }
+  },
+  {
+    "name": "update_description_count_star_to_count_row_id",
+    "input": "SELECT country, COUNT(event_row_id) AS records\nFROM acled.global_events\nWHERE event_type = 'Protests'\n  AND week >= DATE '2025-01-01' AND week < DATE '2026-01-01'\nGROUP BY country\nORDER BY records DESC",
+    "additional_metadata": {
+      "endpoint": "update-nl-from-sql-diff",
+      "previous_input": "The number of protest records per country in 2025, most first.",
+      "previous_sql": "SELECT country, COUNT(*) AS records\nFROM acled.global_events\nWHERE event_type = 'Protests'\n  AND week >= DATE '2025-01-01' AND week < DATE '2026-01-01'\nGROUP BY country\nORDER BY records DESC",
+      "notes": "COUNT(*) became COUNT(event_row_id). That looks like a change to what is counted, but event_row_id is declared NOT NULL (it is every record's key), so all 203 counts are identical. The description should read the same and not invent a change, such as 'records with an id'.",
+      "expect_unchanged": true
+    }
+  },
+  {
+    "name": "update_description_left_table_filter_moved_into_on",
+    "input": "SELECT c.country, SUM(COALESCE(g.events, 0)) AS battles\nFROM acled.countries c\nLEFT JOIN acled.global_events g\n  ON g.country = c.country\n  AND g.event_type = 'Battles'\n  AND g.week >= DATE '2025-01-01'\n  AND c.region = 'Western Africa'\nGROUP BY c.country\nORDER BY battles DESC",
+    "additional_metadata": {
+      "endpoint": "update-nl-from-sql-diff",
+      "previous_input": "Battles since the start of 2025 for every Western African country, with 0 where there were none, most first.",
+      "previous_sql": "SELECT c.country, COALESCE(SUM(g.events), 0) AS battles\nFROM acled.countries c\nLEFT JOIN acled.global_events g\n  ON g.country = c.country\n  AND g.event_type = 'Battles'\n  AND g.week >= DATE '2025-01-01'\nWHERE c.region = 'Western Africa'\nGROUP BY c.country\nORDER BY battles DESC",
+      "notes": "Two edits, one of which changes nothing. The region filter moved from WHERE into the ON clause of the LEFT JOIN. It is on the countries side, so it no longer removes any country: it only decides which countries get their battles joined. Every one of the 251 countries is now listed, not the 16 Western African ones; the 16 keep their numbers (Nigeria 4,679, Burkina Faso 1,628), and the other 235 all show 0, including Ukraine with 51,285 battles since 2025. COALESCE(SUM(g.events), 0) became SUM(COALESCE(g.events, 0)), which gives the same numbers (a country with no battles has one row with no events, which becomes 0 either way; checked, no value differs). The description must say every country is listed, with battles counted only for Western African countries and 0 for all others; one that still lists only Western African countries, or that adds a change for the COALESCE, is wrong."
+    }
+  },
+  {
+    "name": "update_description_region_changed_and_filter_moved",
+    "input": "SELECT c.country, COALESCE(SUM(g.events), 0) AS battles\nFROM acled.countries c\nLEFT JOIN acled.global_events g\n  ON g.country = c.country\n  AND g.week >= DATE '2025-01-01'\nWHERE c.region = 'Eastern Africa'\n  AND g.event_type = 'Battles'\nGROUP BY c.country\nORDER BY battles DESC",
+    "additional_metadata": {
+      "endpoint": "update-nl-from-sql-diff",
+      "previous_input": "Battles since the start of 2025 for every Western African country, with 0 where there were none, most first.",
+      "previous_sql": "SELECT c.country, COALESCE(SUM(g.events), 0) AS battles\nFROM acled.countries c\nLEFT JOIN acled.global_events g\n  ON g.country = c.country\n  AND g.event_type = 'Battles'\n  AND g.week >= DATE '2025-01-01'\nWHERE c.region = 'Western Africa'\nGROUP BY c.country\nORDER BY battles DESC",
+      "notes": "Two changes in one edit. The region changed from Western to Eastern Africa, and the battles filter moved from the ON clause to WHERE, which turns the LEFT JOIN into an inner one: countries with no battles since 2025 drop out, and no 0 is ever shown. 11 rows, not all 19 Eastern African countries (Comoros, Eritrea, Malawi, Mauritius, Mayotte, Reunion, Seychelles and the British Indian Ocean Territory had none). The description must change both; one that updates the region but still says every country, with 0 where there were none, is wrong."
+    }
+  },
+  {
+    "name": "update_description_count_to_count_distinct",
+    "input": "SELECT country, COUNT(DISTINCT week) AS battle_weeks FROM acled.global_events WHERE event_type = 'Battles' AND week >= DATE '2025-01-01' AND week < DATE '2026-01-01' GROUP BY country ORDER BY battle_weeks DESC",
+    "additional_metadata": {
+      "endpoint": "update-nl-from-sql-diff",
+      "previous_input": "For each country, the number of weekly battle records in 2025 (one for each area and week with battles), most first.",
+      "previous_sql": "SELECT country, COUNT(week) AS battle_weeks FROM acled.global_events WHERE event_type = 'Battles' AND week >= DATE '2025-01-01' AND week < DATE '2026-01-01' GROUP BY country ORDER BY battle_weeks DESC",
+      "notes": "COUNT(week) became COUNT(DISTINCT week), with the same alias: it now counts the weeks in 2025 with at least one battle (52 at most), not the records (up to 933). The description must change even though the column name didn't."
+    }
+  },
+  {
+    "name": "update_description_distinct_moved_out_of_count",
+    "input": "SELECT DISTINCT c.region, COUNT(c.country) AS countries, COALESCE(SUM(g.events), 0) AS battles\nFROM acled.countries c\nLEFT JOIN acled.global_events g\n  ON g.country = c.country\n  AND g.event_type = 'Battles'\n  AND g.week >= DATE '2025-01-01'\nWHERE c.region <> 'Europe'\nGROUP BY c.region\nORDER BY 3 DESC",
+    "additional_metadata": {
+      "endpoint": "update-nl-from-sql-diff",
+      "previous_input": "For every region, including the countries with no region, the number of countries and their battles since the start of 2025, with 0 where there were none, most battles first.",
+      "previous_sql": "SELECT c.region, COUNT(DISTINCT c.country) AS countries, COALESCE(SUM(g.events), 0) AS battles\nFROM acled.countries c\nLEFT JOIN acled.global_events g\n  ON g.country = c.country\n  AND g.event_type = 'Battles'\n  AND g.week >= DATE '2025-01-01'\nGROUP BY c.region\nORDER BY battles DESC",
+      "notes": "Four edits, two of which change nothing. DISTINCT moved from inside COUNT to the SELECT: the join makes a row for each weekly battle record (one for a country with none), so countries now counts those rows, not countries, under the same alias; 15 of the 17 counts change (Western Africa 16 becomes 2,886: 2,883 battle records plus 3 countries with none; South America 14 becomes 3,366; East Asia's 6 and Antarctica's 1 stay the same only by chance). SELECT DISTINCT does nothing, as GROUP BY already gives one row per region (17 rows with or without it). The new WHERE c.region <> 'Europe' drops Europe (53 countries, 52,645 battles) and, because a comparison with NULL is never true, also the group of 7 countries with no region: 17 rows instead of 19. ORDER BY 3 is the same as ORDER BY battles, and every remaining region's battles are unchanged. The description must say it counts the battle records (with 1 for a country with none), not countries, and that Europe and the countries with no region are left out; one that says distinct regions, keeps 'number of countries' or keeps 'including the countries with no region' is wrong."
+    }
+  }
+]

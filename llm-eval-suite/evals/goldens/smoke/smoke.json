@@ -1,0 +1,47 @@
+[
+  {
+    "name": "smoke_fix_misspelled_keyword",
+    "input": "SELEC 1 AS one",
+    "expected_output": "SELECT 1 AS one",
+    "additional_metadata": {
+      "endpoint": "explain-sql-error",
+      "errors": [
+        {
+          "message": "syntax error at or near \"SELEC\"",
+          "line": 1,
+          "source": "query"
+        }
+      ],
+      "dialect": "postgresql",
+      "expected_diagnosis": "SELEC is a misspelling of the SELECT keyword.",
+      "notes": "Smoke: needs no tables. The fix runs in SQL Lab, so it shows the plugin, its model, SQL Lab and the judge connecting."
+    }
+  },
+  {
+    "name": "smoke_describe_one_plus_one",
+    "input": "SELECT 1 + 1 AS two",
+    "additional_metadata": {
+      "endpoint": "generate-nl",
+      "notes": "Smoke: needs no tables. A plain-English answer graded by the judge alone."
+    }
+  },
+  {
+    "name": "smoke_refine_add_a_column",
+    "input": "Also return 2 as a second column named two",
+    "expected_output": "SELECT 1 AS one, 2 AS two",
+    "additional_metadata": {
+      "endpoint": "refine-sql",
+      "sql": "SELECT 1 AS one",
+      "notes": "Smoke: needs no tables. The answer and the reference both run in SQL Lab and are timed there."
+    }
+  },
+  {
+    "name": "smoke_todays_date",
+    "input": "What is today's date?",
+    "expected_output": "SELECT CURRENT_DATE AS today",
+    "additional_metadata": {
+      "endpoint": "generate-sql",
+      "notes": "Smoke: needs no tables. The plugin has to answer from the database alone, without naming a table."
+    }
+  }
+]

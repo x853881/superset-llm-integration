@@ -1,0 +1,12 @@
+diff --git a/superset-frontend/src/pages/SqlLab/index.tsx b/superset-frontend/src/pages/SqlLab/index.tsx
+--- a/superset-frontend/src/pages/SqlLab/index.tsx
++++ b/superset-frontend/src/pages/SqlLab/index.tsx
+@@ -38,7 +38,7 @@
+   );
+   const { data, isLoading, isError, error, fulfilledTimeStamp } =
+     useSqlLabInitialState();
+-  const shouldInitialize = lastInitializedAt <= (fulfilledTimeStamp || 0);
++  const shouldInitialize = lastInitializedAt < (fulfilledTimeStamp || 0);
+   const dispatch = useDispatch();
+ 
+   const initBootstrapData = useEffectEvent(

@@ -1,0 +1,28 @@
+# Evaluation framework + judge provider SDKs (anthropic/ollama are optional extras of deepeval)
+deepeval>=4.3,<5
+openai>=1.40
+anthropic>=0.40
+ollama>=0.4
+
+# SQL parsing / static analysis
+sqlglot>=25.0,<28
+
+# Superset API + result comparison
+requests>=2.31
+pandas>=2.1
+
+# Imported by the suite itself. DeepEval and the SDKs install them too.
+# httpx carries the judge's client certificate (evals/judge/model.py).
+httpx>=0.27
+pydantic>=2.0
+python-dotenv>=1.0
+
+# Offline unit testing
+pytest>=8.0
+
+# Asking each golden several times (./run_evals.sh --runs N). DeepEval
+# installs it too; listed because run_evals.sh uses its --repeat-scope.
+pytest-repeat>=0.9
+# Running several goldens at a time (./run_evals.sh --parallel N, through
+# DeepEval's -n). DeepEval installs it too.
+pytest-xdist>=3.5

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Assistant: when the .supx build fails</title>
+<style>
+  :root { --ink: #1d2125; --muted: #5b636b; --line: #d8dde2; --soft: #f3f5f7; --accent: #1f6feb; --warn: #9a3412; }
+  @media (prefers-color-scheme: dark) {
+    :root { --ink: #e6e9ec; --muted: #a2aab3; --line: #3a4148; --soft: #22272c; --accent: #6ea8fe; --warn: #fdba74; }
+    body { background: #181b1f; }
+  }
+  body { font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); margin: 0; }
+  main { max-width: 54rem; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+  h1 { font-size: 1.7rem; margin: 0 0 .5rem; }
+  h2 { font-size: 1.25rem; margin: 2.5rem 0 .5rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+  p, li { max-width: 46rem; }
+  code { font: .9em ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--soft); padding: .1em .3em; border-radius: 4px; }
+  .muted { color: var(--muted); }
+  .block { position: relative; margin: .75rem 0 1rem; }
+  .block pre { margin: 0; background: var(--soft); border: 1px solid var(--line); border-radius: 8px; padding: .9rem 5rem .9rem 1rem;
+           overflow: auto; max-height: 22rem; font: .82rem/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .block button { position: absolute; top: .5rem; right: .5rem; font: .8rem system-ui, sans-serif; cursor: pointer;
+           border: 1px solid var(--line); background: var(--accent); color: #fff; border-radius: 6px; padding: .25rem .7rem; }
+  table { border-collapse: collapse; width: 100%; margin: .75rem 0; font-size: .95rem; }
+  th, td { text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); padding: .45rem .6rem .45rem 0; }
+  th { color: var(--muted); font-weight: 600; font-size: .85rem; }
+  a { color: var(--accent); }
+  .warn { color: var(--warn); }
+</style>
+</head>
+<body>
+<main>
+<h1>When the .supx build fails</h1>
+<p>Building the extension is <code>.venv/bin/superset-extensions bundle</code> in this repo. It builds the frontend
+(the panel) with Node, copies the backend, and zips both into <code>nltosqlandback-0.1.0.supx</code>.</p>
+<p class="warn">If the frontend build fails, <code>bundle</code> prints <code>❌ Frontend build failed</code> and
+carries on: it still writes a <code>.supx</code>, with only the backend in it. Superset loads that happily and the
+panel never appears. So check the <code>.supx</code> after every build (step 3).</p>
+<p class="muted">When the server side looks fine and the panel still doesn't appear, see
+<a href="troubleshoot.html">troubleshoot.html</a>.</p>
+
+<h2 id="needs">What the build needs</h2>
+<table>
+  <tr><th>What</th><th>Version</th><th>Why</th></tr>
+  <tr><td>Node</td><td>18.17 or later; 20 or 22 LTS is best</td><td>webpack-cli needs 18.12, and npm 10.8.2 (below) needs 18.17.</td></tr>
+  <tr><td>npm</td><td>10.8.2 or later</td><td><code>superset-extensions</code> stops before building if npm is older.
+      Node 20.17+ and 22 come with it; otherwise <code>npm install -g npm@10</code>.</td></tr>
+  <tr><td>The npm registry</td><td></td><td>Only the first time, or after <code>frontend/node_modules</code> is deleted: <code>npm ci</code> downloads the build tools.</td></tr>
+  <tr><td>Python 3.9+ and <code>apache-superset-extensions-cli</code></td><td>0.1.0</td><td>In the repo's <code>.venv</code>, as in the README's Option 1, step 1.</td></tr>
+  <tr><td>git</td><td>any</td><td>Optional. The build puts the commit in its label; without git it says <code>unknown commit</code>.</td></tr>
+</table>
+<p class="muted">The <code>.supx</code> is the same file wherever it's built. If the site's machines can't build it,
+build it anywhere that can, from the same commit, and copy the file across.</p>
+
+<h2 id="check">1. Check the build machine</h2>
+<p>In a terminal, go to your checkout of this repo, paste the block below and press Enter. It checks the tools,
+then runs the frontend build on its own and shows its first errors. It changes nothing outside
+<code>frontend/dist</code>, and it doesn't download anything unless <code>node_modules</code> is missing, when it only
+pings the registry.</p>
+<div class="block"><pre id="check-shown"></pre></div>
+<p class="muted">The full build output goes to <code>nlsql-frontend-build.log</code> in your temp folder; the
+last line says where. It prints whether a proxy is set, never its value.</p>
+
+<h2 id="errors">2. What the errors mean</h2>
+<table>
+  <tr><th>You see</th><th>Meaning</th><th>Fix</th></tr>
+  <tr><td><code>node … TOO OLD</code>, or <code>SyntaxError</code> / <code>Unsupported engine</code> from
+      <code>node_modules</code></td><td>Node is older than the build tools.</td><td>Install Node 20 or 22 LTS, then
+      <code>rm -rf frontend/node_modules</code> and build again.</td></tr>
+  <tr><td><code>npm … TOO OLD</code>, or <code>npm version … is lower than the required 10.8.2</code></td>
+      <td>The extensions CLI checks npm first.</td><td><code>npm install -g npm@10</code>, or a newer Node.</td></tr>
+  <tr><td><code>npm is not installed or not on your PATH</code></td><td>No Node at all on this machine, or not on
+      this shell's <code>PATH</code>.</td><td>Install Node 20 or 22 LTS.</td></tr>
+  <tr><td><code>ETIMEDOUT</code>, <code>ENOTFOUND</code>, <code>ECONNREFUSED</code>, <code>E401</code>,
+      <code>E403</code> during <code>npm ci</code></td><td>npm can't reach its registry.</td><td>Point npm at the
+      company's registry or proxy: <code>npm config set registry &lt;url&gt;</code>, or
+      <code>npm config set https-proxy &lt;url&gt;</code>. Or build elsewhere and copy the <code>.supx</code>.</td></tr>
+  <tr><td><code>SELF_SIGNED_CERT_IN_CHAIN</code>, <code>UNABLE_TO_GET_ISSUER_CERT_LOCALLY</code></td><td>A company
+      proxy re-signs HTTPS with its own certificate.</td><td><code>npm config set cafile &lt;the company's CA .pem&gt;</code>.
+      Don't turn <code>strict-ssl</code> off.</td></tr>
+  <tr><td><code>node_modules doesn't match package-lock.json</code>, <code>Cannot find module</code>,
+      <code>webpack: not found</code></td><td><code>node_modules</code> is missing pieces, often from an
+      <code>npm ci</code> that stopped half way. <code>bundle</code> only runs <code>npm ci</code> when the folder
+      is missing altogether.</td><td><code>rm -rf frontend/node_modules</code>, then <code>cd frontend &amp;&amp; npm ci</code>.</td></tr>
+  <tr><td><code>EACCES</code>, <code>permission denied</code></td><td>Files owned by another user, often from an
+      earlier build run with <code>sudo</code>.</td><td>Give them back to your user (<code>chown -R</code>), or use a
+      fresh clone.</td></tr>
+  <tr><td><code>JavaScript heap out of memory</code></td><td>Node's default memory limit is too small here.</td>
+      <td>Run with <code>NODE_OPTIONS=--max-old-space-size=4096</code>.</td></tr>
+  <tr><td><code>TS2…</code> errors, or <code>Module not found: Can't resolve './…'</code> in <code>src</code></td>
+      <td>The code doesn't build as it is: local changes, or a checkout that didn't finish.</td><td>The check shows
+      local changes. <code>git status</code>; for the mirror, <code>git fetch origin &amp;&amp; git reset --hard origin/main</code>.
+      If it's still there, send the output over.</td></tr>
+  <tr><td><code>No remote entry file found</code></td><td>webpack said it worked but wrote nothing to
+      <code>frontend/dist</code>.</td><td>Send the log over.</td></tr>
+  <tr><td><code>superset-extensions: command not found</code></td><td>The CLI is in the repo's virtualenv.</td>
+      <td>Use <code>.venv/bin/superset-extensions</code>, or install it as in the README.</td></tr>
+</table>
+
+<h2 id="bundle">3. Build the .supx and check it</h2>
+<p>When step 1 ends with <code>frontend build OK</code>, from the repo's root:</p>
+<div class="block"><pre>.venv/bin/superset-extensions bundle 2>&1 | tee "${TMPDIR:-/tmp}/nlsql-bundle.log" | grep -E "✅|❌"
+unzip -l nltosqlandback-0.1.0.supx | grep remoteEntry || echo "NO FRONTEND IN THE .supx: don't install it"</pre></div>
+<p>Every line should be ✅, and the last line should name a <code>remoteEntry….js</code> file. Then install the
+<code>.supx</code> and restart Superset, and check from SQL Lab with <a href="troubleshoot.html">troubleshoot.html</a>.</p>
+</main>
+
+<script type="text/plain" id="build-check">
+cat > "${TMPDIR:-/tmp}/nlsql-build-check.sh" <<'EOF'
+cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
+[ -f extension.json ] && [ -d frontend ] || { echo "Run this in your checkout of the plugin's repo."; exit 1; }
+tmp="${TMPDIR:-/tmp}"; log="${tmp%/}/nlsql-frontend-build.log"
+at_least() { node -e 'const [v, m] = process.argv.slice(1).map(s => s.split(".").map(Number));
+  for (let i = 0; i < 3; i++) if ((v[i] || 0) !== (m[i] || 0)) process.exit((v[i] || 0) > (m[i] || 0) ? 0 : 1)' "$1" "$2" </dev/null; }
+
+echo "== Checkout"
+echo "folder: $(pwd)"
+echo "commit: $(git rev-parse --short HEAD 2>/dev/null || echo 'not a git checkout')"
+echo "local changes: $(git status --porcelain 2>/dev/null | grep -v '^??' | wc -l | tr -d ' ') files"
+
+echo "== Tools"
+if command -v node >/dev/null; then
+  v=$(node -v </dev/null | tr -d v)
+  at_least "$v" 18.17.0 && echo "node $v  ok" || echo "node $v  TOO OLD: needs 18.17 or later (20 or 22 LTS is best)"
+else echo "node  NOT FOUND"; fi
+if command -v npm >/dev/null; then
+  v=$(npm -v </dev/null)
+  at_least "$v" 10.8.2 && echo "npm $v  ok" || echo "npm $v  TOO OLD: superset-extensions needs 10.8.2 or later"
+else echo "npm  NOT FOUND"; fi
+cli=.venv/bin/superset-extensions; [ -x "$cli" ] || cli=$(command -v superset-extensions)
+echo "superset-extensions: ${cli:-NOT FOUND (see the README, Option 1, step 1)}"
+echo "proxy: HTTPS_PROXY $([ -n "${HTTPS_PROXY:-$https_proxy}" ] && echo set || echo 'not set'), npm https-proxy $([ "$(npm config get https-proxy </dev/null 2>/dev/null)" = null ] && echo 'not set' || echo set)"
+
+echo "== Frontend dependencies"
+cd frontend
+if [ ! -d node_modules ]; then
+  echo "node_modules missing: bundle will run npm ci, which needs the registry"
+  echo "registry: $(npm config get registry </dev/null)"
+  npm ping </dev/null >/dev/null 2>&1 && echo "registry reachable" || echo "REGISTRY NOT REACHABLE: see the table, npm ci rows"
+  exit 0
+fi
+npm ls --depth=0 </dev/null >/dev/null 2>&1 && echo "node_modules matches package-lock.json" \
+  || echo "node_modules DOESN'T MATCH package-lock.json: rm -rf frontend/node_modules, then npm ci in frontend"
+
+echo "== Frontend build (the step bundle hides when it fails)"
+if npm run build </dev/null >"$log" 2>&1 && ls dist/remoteEntry.*.js >/dev/null 2>&1; then
+  echo "frontend build OK: $(basename dist/remoteEntry.*.js)"
+else
+  echo "FRONTEND BUILD FAILED. First errors:"
+  grep -E "TS[0-9]{4}|ERROR|Error:|ERR!|Cannot|not found|Unsupported|heap|EACCES" "$log" | grep -v "^\[tsl\] ERROR in" | head -15
+fi
+echo "Full output: $log"
+EOF
+bash "${TMPDIR:-/tmp}/nlsql-build-check.sh"
+</script>
+
+<script>
+  const text = id => document.getElementById(id).textContent.replace(/^\n/, '').replace(/\s+$/, '');
+  document.getElementById('check-shown').textContent = text('build-check');
+
+  async function copyText(t) {
+    try { await navigator.clipboard.writeText(t); return; } catch {}
+    const area = Object.assign(document.createElement('textarea'), { value: t });
+    document.body.append(area); area.select(); document.execCommand('copy'); area.remove();
+  }
+  document.querySelectorAll('.block').forEach(block => {
+    const button = Object.assign(document.createElement('button'), { type: 'button', textContent: 'Copy' });
+    button.addEventListener('click', async () => {
+      await copyText(block.querySelector('pre').textContent);
+      button.textContent = 'Copied';
+      setTimeout(() => { button.textContent = 'Copy'; }, 1500);
+    });
+    block.append(button);
+  });
+</script>
+</body>
+</html>

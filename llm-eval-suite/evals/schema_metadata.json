@@ -1,0 +1,1451 @@
+[
+  {
+    "name": "countries",
+    "description": "",
+    "approx_row_count": 251,
+    "columns": {
+      "country": "text",
+      "region": "text",
+      "iso2": "text",
+      "iso3": "text"
+    },
+    "not_null": [
+      "country"
+    ],
+    "schema": "acled",
+    "indexes": [
+      {
+        "name": "countries_pkey",
+        "kind": "btree",
+        "columns": [
+          "country"
+        ]
+      },
+      {
+        "name": "countries_iso2_idx",
+        "kind": "btree",
+        "columns": [
+          "iso2"
+        ]
+      }
+    ],
+    "preferred_for": [],
+    "sensitive_columns": []
+  },
+  {
+    "name": "demonstration_events_country",
+    "description": "",
+    "approx_row_count": 2931,
+    "columns": {
+      "country": "text",
+      "year": "integer",
+      "events": "integer"
+    },
+    "not_null": [
+      "country",
+      "year",
+      "events"
+    ],
+    "schema": "acled",
+    "indexes": [
+      {
+        "name": "demonstration_events_country_pkey",
+        "kind": "btree",
+        "columns": [
+          "country",
+          "year"
+        ]
+      }
+    ],
+    "preferred_for": [],
+    "sensitive_columns": []
+  },
+  {
+    "name": "events_targeting_civilians_country",
+    "description": "",
+    "approx_row_count": 2728,
+    "columns": {
+      "country": "text",
+      "year": "integer",
+      "events": "integer"
+    },
+    "not_null": [
+      "country",
+      "year",
+      "events"
+    ],
+    "schema": "acled",
+    "indexes": [
+      {
+        "name": "events_targeting_civilians_country_pkey",
+        "kind": "btree",
+        "columns": [
+          "country",
+          "year"
+        ]
+      }
+    ],
+    "preferred_for": [],
+    "sensitive_columns": []
+  },
+  {
+    "name": "global_events",
+    "description": "",
+    "approx_row_count": 1001577,
+    "columns": {
+      "week": "date",
+      "region": "text",
+      "country": "text",
+      "admin1": "text",
+      "event_type": "text",
+      "sub_event_type": "text",
+      "events": "integer",
+      "fatalities": "integer",
+      "population_exposure": "bigint",
+      "disorder_type": "text",
+      "id": "integer",
+      "centroid_latitude": "double precision",
+      "centroid_longitude": "double precision",
+      "event_row_id": "bigint"
+    },
+    "not_null": [
+      "week",
+      "country",
+      "event_type",
+      "events",
+      "fatalities",
+      "event_row_id"
+    ],
+    "schema": "acled",
+    "indexes": [
+      {
+        "name": "global_events_pkey",
+        "kind": "btree",
+        "columns": [
+          "event_row_id"
+        ]
+      },
+      {
+        "name": "global_events_week_idx",
+        "kind": "btree",
+        "columns": [
+          "week"
+        ]
+      },
+      {
+        "name": "global_events_country_week_idx",
+        "kind": "btree",
+        "columns": [
+          "country",
+          "week"
+        ]
+      },
+      {
+        "name": "global_events_event_type_idx",
+        "kind": "btree",
+        "columns": [
+          "event_type"
+        ]
+      },
+      {
+        "name": "global_events_admin1_idx",
+        "kind": "btree",
+        "columns": [
+          "admin1"
+        ]
+      }
+    ],
+    "preferred_for": [],
+    "sensitive_columns": []
+  },
+  {
+    "name": "political_violence_country_month",
+    "description": "",
+    "approx_row_count": 29573,
+    "columns": {
+      "country": "text",
+      "month": "text",
+      "year": "integer",
+      "events": "integer"
+    },
+    "not_null": [
+      "country",
+      "month",
+      "year",
+      "events"
+    ],
+    "schema": "acled",
+    "indexes": [
+      {
+        "name": "political_violence_country_month_pkey",
+        "kind": "btree",
+        "columns": [
+          "country",
+          "year",
+          "month"
+        ]
+      }
+    ],
+    "preferred_for": [],
+    "sensitive_columns": []
+  },
+  {
+    "name": "political_violence_year",
+    "description": "",
+    "approx_row_count": 2767,
+    "columns": {
+      "country": "text",
+      "year": "integer",
+      "events": "integer"
+    },
+    "not_null": [
+      "country",
+      "year",
+      "events"
+    ],
+    "schema": "acled",
+    "indexes": [
+      {
+        "name": "political_violence_year_pkey",
+        "kind": "btree",
+        "columns": [
+          "country",
+          "year"
+        ]
+      }
+    ],
+    "preferred_for": [],
+    "sensitive_columns": []
+  },
+  {
+    "name": "reported_civilian_fatalities",
+    "description": "",
+    "approx_row_count": 2728,
+    "columns": {
+      "country": "text",
+      "year": "integer",
+      "fatalities": "integer"
+    },
+    "not_null": [
+      "country",
+      "year",
+      "fatalities"
+    ],
+    "schema": "acled",
+    "indexes": [
+      {
+        "name": "reported_civilian_fatalities_pkey",
+        "kind": "btree",
+        "columns": [
+          "country",
+          "year"
+        ]
+      }
+    ],
+    "preferred_for": [],
+    "sensitive_columns": []
+  },
+  {
+    "name": "reported_fatalities",
+    "description": "",
+    "approx_row_count": 2986,
+    "columns": {
+      "country": "text",
+      "year": "integer",
+      "fatalities": "integer"
+    },
+    "not_null": [
+      "country",
+      "year",
+      "fatalities"
+    ],
+    "schema": "acled",
+    "indexes": [
+      {
+        "name": "reported_fatalities_pkey",
+        "kind": "btree",
+        "columns": [
+          "country",
+          "year"
+        ]
+      }
+    ],
+    "preferred_for": [],
+    "sensitive_columns": []
+  },
+  {
+    "name": "oa_airport_frequencies",
+    "description": "One row per radio frequency used at an airport; airport_ref = oa_airports.id.",
+    "approx_row_count": 30393,
+    "columns": {
+      "id": "integer",
+      "airport_ref": "integer",
+      "airport_ident": "text",
+      "type": "text",
+      "description": "text",
+      "frequency_mhz": "double precision"
+    },
+    "not_null": [
+      "id"
+    ],
+    "schema": "ourairports",
+    "indexes": [
+      {
+        "name": "oa_airport_frequencies_pkey",
+        "kind": "btree",
+        "columns": [
+          "id"
+        ]
+      },
+      {
+        "name": "oa_airport_frequencies_airport_ref_idx",
+        "kind": "btree",
+        "columns": [
+          "airport_ref"
+        ]
+      }
+    ],
+    "preferred_for": [],
+    "sensitive_columns": []
+  },
+  {
+    "name": "oa_airports",
+    "description": "One row per airport, heliport or seaplane base (OurAirports), including closed ones (type 'closed'). iso_country is ISO alpha-2 (joins geo.country_info.iso and oa_countries.code); iso_region joins oa_regions.code. ident is unique; iata_code and icao_code can be NULL or shared. Distances to ACLED region centres: latitude_deg / longitude_deg.",
+    "approx_row_count": 86336,
+    "columns": {
+      "id": "integer",
+      "ident": "text",
+      "type": "text",
+      "name": "text",
+      "latitude_deg": "double precision",
+      "longitude_deg": "double precision",
+      "elevation_ft": "integer",
+      "continent": "text",
+      "iso_country": "text",
+      "iso_region": "text",
+      "municipality": "text",
+      "scheduled_service": "boolean",
+      "icao_code": "text",
+      "iata_code": "text",
+      "gps_code": "text",
+      "local_code": "text",
+      "home_link": "text",
+      "wikipedia_link": "text",
+      "keywords": "text"
+    },
+    "not_null": [
+      "id"
+    ],
+    "schema": "ourairports",
+    "indexes": [
+      {
+        "name": "oa_airports_pkey",
+        "kind": "btree",
+        "columns": [
+          "id"
+        ]
+      },
+      {
+        "name": "oa_airports_ident_idx",
+        "kind": "btree",
+        "columns": [
+          "ident"
+        ]
+      },
+      {
+        "name": "oa_airports_iata_code_idx",
+        "kind": "btree",
+        "columns": [
+          "iata_code"
+        ]
+      },
+      {
+        "name": "oa_airports_icao_code_idx",
+        "kind": "btree",
+        "columns": [
+          "icao_code"
+        ]
+      },
+      {
+        "name": "oa_airports_iso_country_idx",
+        "kind": "btree",
+        "columns": [
+          "iso_country"
+        ]
+      },
+      {
+        "name": "oa_airports_iso_region_idx",
+        "kind": "btree",
+        "columns": [
+          "iso_region"
+        ]
+      },
+      {
+        "name": "oa_airports_latitude_deg_longitude_deg_idx",
+        "kind": "btree",
+        "columns": [
+          "latitude_deg",
+          "longitude_deg"
+        ]
+      }
+    ],
+    "preferred_for": [],
+    "sensitive_columns": []
+  },
+  {
+    "name": "oa_countries",
+    "description": "One row per country in OurAirports; code is ISO alpha-2.",
+    "approx_row_count": 249,
+    "columns": {
+      "id": "integer",
+      "code": "text",
+      "name": "text",
+      "continent": "text",
+      "wikipedia_link": "text",
+      "keywords": "text"
+    },
+    "not_null": [
+      "id"
+    ],
+    "schema": "ourairports",
+    "indexes": [
+      {
+        "name": "oa_countries_pkey",
+        "kind": "btree",
+        "columns": [
+          "id"
+        ]
+      },
+      {
+        "name": "oa_countries_code_idx",
+        "kind": "btree",
+        "columns": [
+          "code"
+        ]
+      }
+    ],
+    "preferred_for": [],
+    "sensitive_columns": []
+  },
+  {
+    "name": "oa_navaids",
+    "description": "One row per radio navigation aid; associated_airport = oa_airports.ident, NULL for a third of them.",
+    "approx_row_count": 11008,
+    "columns": {
+      "id": "integer",
+      "filename": "text",
+      "ident": "text",
+      "name": "text",
+      "type": "text",
+      "frequency_khz": "double precision",
+      "latitude_deg": "double precision",
+      "longitude_deg": "double precision",
+      "elevation_ft": "integer",
+      "iso_country": "text",
+      "dme_frequency_khz": "double precision",
+      "dme_channel": "text",
+      "dme_latitude_deg": "double precision",
+      "dme_longitude_deg": "double precision",
+      "dme_elevation_ft": "integer",
+      "slaved_variation_deg": "double precision",
+      "magnetic_variation_deg": "double precision",
+      "usagetype": "text",
+      "power": "text",
+      "associated_airport": "text"
+    },
+    "not_null": [
+      "id"
+    ],
+    "schema": "ourairports",
+    "indexes": [
+      {
+        "name": "oa_navaids_pkey",
+        "kind": "btree",
+        "columns": [
+          "id"
+        ]
+      },
+      {
+        "name": "oa_navaids_associated_airport_idx",
+        "kind": "btree",
+        "columns": [
+          "associated_airport"
+        ]
+      }
+    ],
+    "preferred_for": [],
+    "sensitive_columns": []
+  },
+  {
+    "name": "oa_regions",
+    "description": "One row per region in OurAirports; code (e.g. 'US-PA') is what oa_airports.iso_region holds.",
+    "approx_row_count": 3987,
+    "columns": {
+      "id": "integer",
+      "code": "text",
+      "local_code": "text",
+      "name": "text",
+      "continent": "text",
+      "iso_country": "text",
+      "wikipedia_link": "text",
+      "keywords": "text"
+    },
+    "not_null": [
+      "id"
+    ],
+    "schema": "ourairports",
+    "indexes": [
+      {
+        "name": "oa_regions_pkey",
+        "kind": "btree",
+        "columns": [
+          "id"
+        ]
+      },
+      {
+        "name": "oa_regions_code_idx",
+        "kind": "btree",
+        "columns": [
+          "code"
+        ]
+      }
+    ],
+    "preferred_for": [],
+    "sensitive_columns": []
+  },
+  {
+    "name": "oa_runways",
+    "description": "One row per runway; airport_ref = oa_airports.id. length_ft and width_ft in feet; closed and lighted are booleans.",
+    "approx_row_count": 48405,
+    "columns": {
+      "id": "integer",
+      "airport_ref": "integer",
+      "airport_ident": "text",
+      "length_ft": "integer",
+      "width_ft": "integer",
+      "surface": "text",
+      "lighted": "boolean",
+      "closed": "boolean",
+      "le_ident": "text",
+      "le_latitude_deg": "double precision",
+      "le_longitude_deg": "double precision",
+      "le_elevation_ft": "integer",
+      "le_heading_degt": "double precision",
+      "le_displaced_threshold_ft": "integer",
+      "he_ident": "text",
+      "he_latitude_deg": "double precision",
+      "he_longitude_deg": "double precision",
+      "he_elevation_ft": "integer",
+      "he_heading_degt": "double precision",
+      "he_displaced_threshold_ft": "integer"
+    },
+    "not_null": [
+      "id"
+    ],
+    "schema": "ourairports",
+    "indexes": [
+      {
+        "name": "oa_runways_pkey",
+        "kind": "btree",
+        "columns": [
+          "id"
+        ]
+      },
+      {
+        "name": "oa_runways_airport_ref_idx",
+        "kind": "btree",
+        "columns": [
+          "airport_ref"
+        ]
+      }
+    ],
+    "preferred_for": [],
+    "sensitive_columns": []
+  },
+  {
+    "name": "wdi",
+    "description": "WDI unpivoted, for a few indicators only (population, GDP, GDP per capita, military expenditure, refugees, urban population): one row per country, indicator and year with a value. iso3 joins geo.country_info.iso3 and acled.countries.iso3. For these indicators it's the faster source: keyed on (iso3, indicator_code, year), where wdi_wide needs a scan and one column per year.",
+    "approx_row_count": 75299,
+    "columns": {
+      "iso3": "text",
+      "indicator_code": "text",
+      "year": "integer",
+      "value": "double precision"
+    },
+    "not_null": [
+      "iso3",
+      "indicator_code",
+      "year"
+    ],
+    "schema": "wdi",
+    "indexes": [
+      {
+        "name": "wdi_pkey",
+        "kind": "btree",
+        "columns": [
+          "iso3",
+          "indicator_code",
+          "year"
+        ]
+      },
+      {
+        "name": "wdi_indicator_code_year_idx",
+        "kind": "btree",
+        "columns": [
+          "indicator_code",
+          "year"
+        ]
+      }
+    ],
+    "preferred_for": [],
+    "sensitive_columns": []
+  },
+  {
+    "name": "wdi_indicators",
+    "description": "One row per WDI indicator: series_code = wdi.indicator_code, with its name, definition and source.",
+    "approx_row_count": 1498,
+    "columns": {
+      "series_code": "text",
+      "topic": "text",
+      "indicator_name": "text",
+      "short_definition": "text",
+      "long_definition": "text",
+      "unit_of_measure": "text",
+      "periodicity": "text",
+      "base_period": "text",
+      "other_notes": "text",
+      "aggregation_method": "text",
+      "limitations_and_exceptions": "text",
+      "notes_from_original_source": "text",
+      "general_comments": "text",
+      "source": "text",
+      "statistical_concept_and_methodology": "text",
+      "development_relevance": "text",
+      "related_source_links": "text",
+      "other_web_links": "text",
+      "related_indicators": "text",
+      "license_type": "text"
+    },
+    "not_null": [
+      "series_code"
+    ],
+    "schema": "wdi",
+    "indexes": [
+      {
+        "name": "wdi_indicators_pkey",
+        "kind": "btree",
+        "columns": [
+          "series_code"
+        ]
+      }
+    ],
+    "preferred_for": [],
+    "sensitive_columns": []
+  },
+  {
+    "name": "wdi_wide",
+    "description": "World Bank World Development Indicators as published: one row per country (or regional aggregate) and indicator, one column per year (y1960 ... y2025). country_code is ISO alpha-3 for countries; aggregates such as WLD have codes that match no country.",
+    "approx_row_count": 398468,
+    "columns": {
+      "country_name": "text",
+      "country_code": "text",
+      "indicator_name": "text",
+      "indicator_code": "text",
+      "y1960": "double precision",
+      "y1961": "double precision",
+      "y1962": "double precision",
+      "y1963": "double precision",
+      "y1964": "double precision",
+      "y1965": "double precision",
+      "y1966": "double precision",
+      "y1967": "double precision",
+      "y1968": "double precision",
+      "y1969": "double precision",
+      "y1970": "double precision",
+      "y1971": "double precision",
+      "y1972": "double precision",
+      "y1973": "double precision",
+      "y1974": "double precision",
+      "y1975": "double precision",
+      "y1976": "double precision",
+      "y1977": "double precision",
+      "y1978": "double precision",
+      "y1979": "double precision",
+      "y1980": "double precision",
+      "y1981": "double precision",
+      "y1982": "double precision",
+      "y1983": "double precision",
+      "y1984": "double precision",
+      "y1985": "double precision",
+      "y1986": "double precision",
+      "y1987": "double precision",
+      "y1988": "double precision",
+      "y1989": "double precision",
+      "y1990": "double precision",
+      "y1991": "double precision",
+      "y1992": "double precision",
+      "y1993": "double precision",
+      "y1994": "double precision",
+      "y1995": "double precision",
+      "y1996": "double precision",
+      "y1997": "double precision",
+      "y1998": "double precision",
+      "y1999": "double precision",
+      "y2000": "double precision",
+      "y2001": "double precision",
+      "y2002": "double precision",
+      "y2003": "double precision",
+      "y2004": "double precision",
+      "y2005": "double precision",
+      "y2006": "double precision",
+      "y2007": "double precision",
+      "y2008": "double precision",
+      "y2009": "double precision",
+      "y2010": "double precision",
+      "y2011": "double precision",
+      "y2012": "double precision",
+      "y2013": "double precision",
+      "y2014": "double precision",
+      "y2015": "double precision",
+      "y2016": "double precision",
+      "y2017": "double precision",
+      "y2018": "double precision",
+      "y2019": "double precision",
+      "y2020": "double precision",
+      "y2021": "double precision",
+      "y2022": "double precision",
+      "y2023": "double precision",
+      "y2024": "double precision",
+      "y2025": "double precision"
+    },
+    "not_null": [
+      "country_code",
+      "indicator_code"
+    ],
+    "schema": "wdi",
+    "indexes": [
+      {
+        "name": "wdi_wide_pkey",
+        "kind": "btree",
+        "columns": [
+          "country_code",
+          "indicator_code"
+        ]
+      }
+    ],
+    "preferred_for": [],
+    "sensitive_columns": []
+  },
+  {
+    "name": "ucdp_country_year",
+    "description": "Materialized view: ucdp_ged totalled by country, year and type of violence (1 state-based, 2 non-state, 3 one-sided), with UCDP's region. One row per country_id, year and type_of_violence with events (count of events) and the sums of best, low, high and deaths_civilians. Gives the same totals as ucdp_ged from about 4,000 rows instead of 418,000. country_id is the Gleditsch-Ward code: join geo.country_info.gw_code. Rebuilt by test_data/load_linked.sh.",
+    "approx_row_count": 3999,
+    "columns": {
+      "country_id": "integer",
+      "country": "text",
+      "region": "text",
+      "year": "integer",
+      "type_of_violence": "integer",
+      "events": "integer",
+      "deaths_best": "integer",
+      "deaths_low": "integer",
+      "deaths_high": "integer",
+      "deaths_civilians": "integer"
+    },
+    "not_null": [],
+    "schema": "ucdp",
+    "indexes": [
+      {
+        "name": "ucdp_country_year_country_id_year_type_of_violence_idx",
+        "kind": "btree",
+        "columns": [
+          "country_id",
+          "year",
+          "type_of_violence"
+        ]
+      },
+      {
+        "name": "ucdp_country_year_year_idx",
+        "kind": "btree",
+        "columns": [
+          "year"
+        ]
+      }
+    ],
+    "preferred_for": [
+      "per year",
+      "each year",
+      "by year",
+      "per country",
+      "each country",
+      "annual"
+    ],
+    "sensitive_columns": [],
+    "rollup_of": "ucdp_ged"
+  },
+  {
+    "name": "ucdp_ged",
+    "description": "One row per UCDP georeferenced conflict event (1989-2025). country_id is the Gleditsch-Ward code (joins geo.country_info.gw_code). best is the best estimate of deaths (0 for some events). side_a / side_b are the actors' names. date_start / date_end are dates; ACLED rows are weeks starting on a Saturday.",
+    "approx_row_count": 417968,
+    "columns": {
+      "id": "integer",
+      "relid": "text",
+      "year": "integer",
+      "active_year": "boolean",
+      "code_status": "text",
+      "type_of_violence": "integer",
+      "conflict_dset_id": "integer",
+      "conflict_new_id": "integer",
+      "conflict_name": "text",
+      "dyad_dset_id": "integer",
+      "dyad_new_id": "integer",
+      "dyad_name": "text",
+      "side_a_dset_id": "integer",
+      "side_a_new_id": "integer",
+      "side_a": "text",
+      "side_b_dset_id": "integer",
+      "side_b_new_id": "integer",
+      "side_b": "text",
+      "number_of_sources": "integer",
+      "source_article": "text",
+      "source_office": "text",
+      "source_date": "text",
+      "source_headline": "text",
+      "source_original": "text",
+      "where_prec": "integer",
+      "where_coordinates": "text",
+      "where_description": "text",
+      "adm_1": "text",
+      "adm_2": "text",
+      "latitude": "double precision",
+      "longitude": "double precision",
+      "geom_wkt": "text",
+      "priogrid_gid": "integer",
+      "country": "text",
+      "country_id": "integer",
+      "region": "text",
+      "event_clarity": "integer",
+      "date_prec": "integer",
+      "date_start": "date",
+      "date_end": "date",
+      "deaths_a": "integer",
+      "deaths_b": "integer",
+      "deaths_civilians": "integer",
+      "deaths_unknown": "integer",
+      "best": "integer",
+      "high": "integer",
+      "low": "integer",
+      "gwnoa": "text",
+      "gwnob": "text"
+    },
+    "not_null": [
+      "id"
+    ],
+    "schema": "ucdp",
+    "indexes": [
+      {
+        "name": "ucdp_ged_pkey",
+        "kind": "btree",
+        "columns": [
+          "id"
+        ]
+      },
+      {
+        "name": "ucdp_ged_country_id_date_start_idx",
+        "kind": "btree",
+        "columns": [
+          "country_id",
+          "date_start"
+        ]
+      },
+      {
+        "name": "ucdp_ged_date_start_idx",
+        "kind": "btree",
+        "columns": [
+          "date_start"
+        ]
+      },
+      {
+        "name": "ucdp_ged_latitude_longitude_idx",
+        "kind": "btree",
+        "columns": [
+          "latitude",
+          "longitude"
+        ]
+      },
+      {
+        "name": "ucdp_ged_conflict_new_id_idx",
+        "kind": "btree",
+        "columns": [
+          "conflict_new_id"
+        ]
+      },
+      {
+        "name": "ucdp_ged_type_of_violence_year_idx",
+        "kind": "btree",
+        "columns": [
+          "type_of_violence",
+          "year"
+        ]
+      }
+    ],
+    "preferred_for": [],
+    "sensitive_columns": []
+  },
+  {
+    "name": "of_airlines",
+    "description": "One row per airline (OpenFlights); of_routes.airline_id = airline_id.",
+    "approx_row_count": 6162,
+    "columns": {
+      "airline_id": "integer",
+      "name": "text",
+      "alias": "text",
+      "iata": "text",
+      "icao": "text",
+      "callsign": "text",
+      "country": "text",
+      "active": "text"
+    },
+    "not_null": [
+      "airline_id"
+    ],
+    "schema": "openflights",
+    "indexes": [
+      {
+        "name": "of_airlines_pkey",
+        "kind": "btree",
+        "columns": [
+          "airline_id"
+        ]
+      }
+    ],
+    "preferred_for": [],
+    "sensitive_columns": []
+  },
+  {
+    "name": "of_route_legs",
+    "description": "of_routes collapsed to one row per airport pair (source_airport_ref to dest_airport_ref, both oa_airports.id), with both airports' IATA codes and countries (source_country, dest_country: ISO-2, as oa_airports.iso_country), the great-circle distance_km between them, routes (rows of of_routes for the pair: one per airline and codeshare) and airlines (distinct airline_id). Only routes whose two airports were matched. A reverse flight is its own row.",
+    "approx_row_count": 36711,
+    "columns": {
+      "source_airport_ref": "integer",
+      "dest_airport_ref": "integer",
+      "source_iata": "text",
+      "dest_iata": "text",
+      "source_country": "text",
+      "dest_country": "text",
+      "distance_km": "double precision",
+      "routes": "integer",
+      "airlines": "integer"
+    },
+    "not_null": [
+      "source_airport_ref",
+      "dest_airport_ref"
+    ],
+    "schema": "openflights",
+    "indexes": [
+      {
+        "name": "of_route_legs_pkey",
+        "kind": "btree",
+        "columns": [
+          "source_airport_ref",
+          "dest_airport_ref"
+        ]
+      },
+      {
+        "name": "of_route_legs_dest_airport_ref_idx",
+        "kind": "btree",
+        "columns": [
+          "dest_airport_ref"
+        ]
+      },
+      {
+        "name": "of_route_legs_source_country_dest_country_idx",
+        "kind": "btree",
+        "columns": [
+          "source_country",
+          "dest_country"
+        ]
+      }
+    ],
+    "preferred_for": [
+      "distance",
+      "longest",
+      "shortest",
+      " km",
+      "foreign destination"
+    ],
+    "sensitive_columns": [],
+    "rollup_of": "of_routes"
+  },
+  {
+    "name": "of_routes",
+    "description": "One row per airline route between two airports (OpenFlights, a 2014 snapshot): an airport-to-airport graph for recursive queries. source_airport and dest_airport are IATA (sometimes ICAO) codes; source_airport_ref and dest_airport_ref are the matching ourairports.oa_airports.id (NULL for about 1% of routes).",
+    "approx_row_count": 67663,
+    "columns": {
+      "airline": "text",
+      "airline_id": "integer",
+      "source_airport": "text",
+      "source_airport_id": "integer",
+      "dest_airport": "text",
+      "dest_airport_id": "integer",
+      "codeshare": "boolean",
+      "stops": "integer",
+      "equipment": "text",
+      "route_id": "integer",
+      "source_airport_ref": "integer",
+      "dest_airport_ref": "integer"
+    },
+    "not_null": [
+      "route_id"
+    ],
+    "schema": "openflights",
+    "indexes": [
+      {
+        "name": "of_routes_pkey",
+        "kind": "btree",
+        "columns": [
+          "route_id"
+        ]
+      },
+      {
+        "name": "of_routes_source_airport_idx",
+        "kind": "btree",
+        "columns": [
+          "source_airport"
+        ]
+      },
+      {
+        "name": "of_routes_dest_airport_idx",
+        "kind": "btree",
+        "columns": [
+          "dest_airport"
+        ]
+      },
+      {
+        "name": "of_routes_source_airport_ref_idx",
+        "kind": "btree",
+        "columns": [
+          "source_airport_ref"
+        ]
+      },
+      {
+        "name": "of_routes_dest_airport_ref_idx",
+        "kind": "btree",
+        "columns": [
+          "dest_airport_ref"
+        ]
+      },
+      {
+        "name": "of_routes_airline_id_idx",
+        "kind": "btree",
+        "columns": [
+          "airline_id"
+        ]
+      }
+    ],
+    "preferred_for": [],
+    "sensitive_columns": []
+  },
+  {
+    "name": "os_country_counts",
+    "description": "OpenSanctions targets counted per country code and schema (Person, Company, Vessel...): one row per country_code (lower-case ISO-2, as os_target_countries) and schema, with targets. A target linked to several countries is counted once under each, so adding counts across countries counts some targets more than once: for distinct targets across several countries use os_target_countries.",
+    "approx_row_count": 992,
+    "columns": {
+      "country_code": "text",
+      "schema": "text",
+      "targets": "integer"
+    },
+    "not_null": [
+      "country_code",
+      "schema"
+    ],
+    "schema": "opensanctions_public",
+    "indexes": [
+      {
+        "name": "os_country_counts_pkey",
+        "kind": "btree",
+        "columns": [
+          "country_code",
+          "schema"
+        ]
+      }
+    ],
+    "preferred_for": [
+      "per country",
+      "each country",
+      "by country"
+    ],
+    "sensitive_columns": [],
+    "rollup_of": "os_target_countries"
+  },
+  {
+    "name": "os_target_aliases",
+    "description": "One row per entity and alternative name; target_id = os_targets.id.",
+    "approx_row_count": 1393025,
+    "columns": {
+      "target_id": "text",
+      "alias": "text"
+    },
+    "not_null": [],
+    "schema": "opensanctions_public",
+    "indexes": [
+      {
+        "name": "os_target_aliases_target_id_idx",
+        "kind": "btree",
+        "columns": [
+          "target_id"
+        ]
+      }
+    ],
+    "preferred_for": [],
+    "sensitive_columns": []
+  },
+  {
+    "name": "os_target_countries",
+    "description": "One row per entity and country; target_id = os_targets.id. country_code is lower-case ISO alpha-2: join geo.country_info on upper(country_code) = iso.",
+    "approx_row_count": 1212060,
+    "columns": {
+      "target_id": "text",
+      "country_code": "text"
+    },
+    "not_null": [
+      "target_id",
+      "country_code"
+    ],
+    "schema": "opensanctions_public",
+    "indexes": [
+      {
+        "name": "os_target_countries_pkey",
+        "kind": "btree",
+        "columns": [
+          "target_id",
+          "country_code"
+        ]
+      },
+      {
+        "name": "os_target_countries_country_code_idx",
+        "kind": "btree",
+        "columns": [
+          "country_code"
+        ]
+      }
+    ],
+    "preferred_for": [],
+    "sensitive_columns": []
+  },
+  {
+    "name": "os_targets",
+    "description": "One row per sanctioned or otherwise listed entity (OpenSanctions targets): people, companies, vessels and more (schema). countries and aliases are ;-separated lists of lower-case ISO alpha-2 codes and names; os_target_countries and os_target_aliases have one row per value. Join to geo.country_info with upper(country_code) = iso.",
+    "approx_row_count": 1242510,
+    "columns": {
+      "id": "text",
+      "schema": "text",
+      "name": "text",
+      "aliases": "text",
+      "birth_date": "text",
+      "countries": "text",
+      "addresses": "text",
+      "identifiers": "text",
+      "sanctions": "text",
+      "phones": "text",
+      "emails": "text",
+      "program_ids": "text",
+      "dataset": "text",
+      "first_seen": "timestamp without time zone",
+      "last_seen": "timestamp without time zone",
+      "last_change": "timestamp without time zone"
+    },
+    "not_null": [
+      "id"
+    ],
+    "schema": "opensanctions_public",
+    "indexes": [
+      {
+        "name": "os_targets_pkey",
+        "kind": "btree",
+        "columns": [
+          "id"
+        ]
+      },
+      {
+        "name": "os_targets_schema_idx",
+        "kind": "btree",
+        "columns": [
+          "schema"
+        ]
+      },
+      {
+        "name": "os_targets_lower_idx",
+        "kind": "btree",
+        "columns": [
+          "lower(name)"
+        ]
+      }
+    ],
+    "preferred_for": [],
+    "sensitive_columns": []
+  },
+  {
+    "name": "acled_region_links",
+    "description": "One row per ACLED region (region_id = acled.global_events.id; a country and admin1) with its links to the other datasets worked out: iso2, the region's centre point (latitude, longitude, as global_events.centroid_*), gn_admin1_code (the geo.gn_admin1 area its name matches: exact, then case-insensitive; NULL where neither matches), the nearest GeoNames place within about 110 km (nearest_city_id, nearest_city, nearest_city_km) and the nearest large or medium airport in any country (nearest_airport_id = oa_airports.id, nearest_airport_ident, nearest_airport_km; ties go to the lowest id). The nearest airport can be across a border: for an airport in the same country, compute it from oa_airports.",
+    "approx_row_count": 3491,
+    "columns": {
+      "region_id": "integer",
+      "country": "text",
+      "admin1": "text",
+      "iso2": "text",
+      "latitude": "double precision",
+      "longitude": "double precision",
+      "gn_admin1_code": "text",
+      "nearest_city_id": "integer",
+      "nearest_city": "text",
+      "nearest_city_km": "double precision",
+      "nearest_airport_id": "integer",
+      "nearest_airport_ident": "text",
+      "nearest_airport_km": "double precision"
+    },
+    "not_null": [
+      "region_id"
+    ],
+    "schema": "geo",
+    "indexes": [
+      {
+        "name": "acled_region_links_pkey",
+        "kind": "btree",
+        "columns": [
+          "region_id"
+        ]
+      },
+      {
+        "name": "acled_region_links_country_admin1_idx",
+        "kind": "btree",
+        "columns": [
+          "country",
+          "admin1"
+        ]
+      },
+      {
+        "name": "acled_region_links_nearest_airport_id_idx",
+        "kind": "btree",
+        "columns": [
+          "nearest_airport_id"
+        ]
+      }
+    ],
+    "preferred_for": [
+      "nearest airport",
+      "nearest city",
+      "nearest place",
+      "closest airport"
+    ],
+    "sensitive_columns": []
+  },
+  {
+    "name": "gn_admin1",
+    "description": "One row per first-level admin area (GeoNames). code is country.admin1 (e.g. 'NG.05'), also split into country_code and admin1_code. ACLED admin1 names match name or asciiname exactly for about half of ACLED's regions; the rest need case-insensitive matching within the same country, or don't match by name.",
+    "approx_row_count": 3865,
+    "columns": {
+      "code": "text",
+      "name": "text",
+      "asciiname": "text",
+      "geonameid": "integer",
+      "country_code": "text",
+      "admin1_code": "text"
+    },
+    "not_null": [
+      "code"
+    ],
+    "schema": "geo",
+    "indexes": [
+      {
+        "name": "gn_admin1_pkey",
+        "kind": "btree",
+        "columns": [
+          "code"
+        ]
+      },
+      {
+        "name": "gn_admin1_country_code_admin1_code_idx",
+        "kind": "btree",
+        "columns": [
+          "country_code",
+          "admin1_code"
+        ]
+      },
+      {
+        "name": "gn_admin1_lower_idx",
+        "kind": "btree",
+        "columns": [
+          "lower(name)"
+        ]
+      }
+    ],
+    "preferred_for": [],
+    "sensitive_columns": []
+  },
+  {
+    "name": "gn_admin2",
+    "description": "One row per second-level admin area (GeoNames). code is country.admin1.admin2, also split into country_code, admin1_code and admin2_code; (country_code, admin1_code) joins gn_admin1.",
+    "approx_row_count": 47760,
+    "columns": {
+      "code": "text",
+      "name": "text",
+      "asciiname": "text",
+      "geonameid": "integer",
+      "country_code": "text",
+      "admin1_code": "text",
+      "admin2_code": "text"
+    },
+    "not_null": [
+      "code"
+    ],
+    "schema": "geo",
+    "indexes": [
+      {
+        "name": "gn_admin2_pkey",
+        "kind": "btree",
+        "columns": [
+          "code"
+        ]
+      },
+      {
+        "name": "gn_admin2_country_code_admin1_code_idx",
+        "kind": "btree",
+        "columns": [
+          "country_code",
+          "admin1_code"
+        ]
+      }
+    ],
+    "preferred_for": [],
+    "sensitive_columns": []
+  },
+  {
+    "name": "gn_cities",
+    "description": "One row per GeoNames place with 500+ people. country_code is ISO alpha-2; country_code + admin1_code joins gn_admin1, + admin2_code joins gn_admin2. No PostGIS: for distances, filter a latitude/longitude box first, then use the haversine formula.",
+    "approx_row_count": 236908,
+    "columns": {
+      "geonameid": "integer",
+      "name": "text",
+      "asciiname": "text",
+      "alternatenames": "text",
+      "latitude": "double precision",
+      "longitude": "double precision",
+      "feature_class": "text",
+      "feature_code": "text",
+      "country_code": "text",
+      "cc2": "text",
+      "admin1_code": "text",
+      "admin2_code": "text",
+      "admin3_code": "text",
+      "admin4_code": "text",
+      "population": "bigint",
+      "elevation": "integer",
+      "dem": "integer",
+      "timezone": "text",
+      "modification_date": "date"
+    },
+    "not_null": [
+      "geonameid"
+    ],
+    "schema": "geo",
+    "indexes": [
+      {
+        "name": "gn_cities_pkey",
+        "kind": "btree",
+        "columns": [
+          "geonameid"
+        ]
+      },
+      {
+        "name": "gn_cities_country_code_admin1_code_admin2_code_idx",
+        "kind": "btree",
+        "columns": [
+          "country_code",
+          "admin1_code",
+          "admin2_code"
+        ]
+      },
+      {
+        "name": "gn_cities_latitude_longitude_idx",
+        "kind": "btree",
+        "columns": [
+          "latitude",
+          "longitude"
+        ]
+      },
+      {
+        "name": "gn_cities_lower_idx",
+        "kind": "btree",
+        "columns": [
+          "lower(name)"
+        ]
+      }
+    ],
+    "preferred_for": [],
+    "sensitive_columns": []
+  },
+  {
+    "name": "country_info",
+    "description": "One row per country (GeoNames). The code crosswalk: iso (ISO alpha-2, upper case), iso3, iso_numeric (zero-padded text, e.g. '004'), fips, and gw_code (Gleditsch-Ward, UCDP's ucdp_ged.country_id; only countries with UCDP events have one). ACLED joins through acled.countries: iso2 = iso.",
+    "approx_row_count": 252,
+    "columns": {
+      "iso": "text",
+      "iso3": "text",
+      "iso_numeric": "text",
+      "fips": "text",
+      "country": "text",
+      "capital": "text",
+      "area_sq_km": "double precision",
+      "population": "bigint",
+      "continent": "text",
+      "tld": "text",
+      "currency_code": "text",
+      "currency_name": "text",
+      "phone": "text",
+      "postal_code_format": "text",
+      "postal_code_regex": "text",
+      "languages": "text",
+      "geonameid": "integer",
+      "neighbours": "text",
+      "equivalent_fips_code": "text",
+      "gw_code": "integer"
+    },
+    "not_null": [
+      "iso"
+    ],
+    "schema": "geo",
+    "indexes": [
+      {
+        "name": "country_info_pkey",
+        "kind": "btree",
+        "columns": [
+          "iso"
+        ]
+      },
+      {
+        "name": "country_info_iso3_idx",
+        "kind": "btree",
+        "columns": [
+          "iso3"
+        ]
+      },
+      {
+        "name": "country_info_iso_numeric_idx",
+        "kind": "btree",
+        "columns": [
+          "iso_numeric"
+        ]
+      },
+      {
+        "name": "country_info_gw_code_idx",
+        "kind": "btree",
+        "columns": [
+          "gw_code"
+        ]
+      }
+    ],
+    "preferred_for": [],
+    "sensitive_columns": []
+  }
+]
