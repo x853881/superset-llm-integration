@@ -1,0 +1,21 @@
+# The image needs only the requirements files, pytest.ini, run_evals.sh,
+# run/, evals/ and reports/report.py (see Dockerfile). Keep secrets, the dev
+# folder, production's folder and bulky local state out of the build.
+.git
+dev
+production
+test_data
+.env
+.env.*
+.venv
+venv
+results
+.deepeval
+.pytest_cache
+.mypy_cache
+.ruff_cache
+**/__pycache__
+**/*.pyc
+.vscode
+.idea
+**/.DS_Store

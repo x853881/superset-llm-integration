@@ -1,0 +1,1 @@
+print("superset-llm-integration extension registered")

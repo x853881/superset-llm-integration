@@ -1,0 +1,44 @@
+# Options for a developer's machine (run_evals.sh and run/unit.sh use them
+# when the folder is there). Each developer keeps their own copy.
+dev/
+
+# Your settings and API keys. Only the example is shared.
+.env
+.env.*
+!.env.eval.example
+
+# Production's secrets, if they are put in production/ on the way to a
+# Kubernetes Secret (production/README.md, steps 3 and 4): never in git.
+production/login.env
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Run output: reports, raw results, console logs
+results/
+
+# DeepEval's local state (login, cached results)
+.deepeval/
+
+# ACLED downloads, if someone puts them in the repo (they're loaded from
+# ~/Downloads by default, and ACLED's terms limit sharing the raw data)
+test_data/*.xlsx
+test_data/*.csv
+
+# Linked open datasets (test_data/download_linked.sh)
+test_data/raw/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store

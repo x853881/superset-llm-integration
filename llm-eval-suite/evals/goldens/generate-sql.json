@@ -1,0 +1,237 @@
+[
+  {
+    "name": "acled_kenya_protest_events_2025",
+    "input": "How many protest events were recorded in Kenya in 2025?",
+    "expected_output": "SELECT SUM(events) AS protest_events FROM acled.global_events WHERE country = 'Kenya' AND event_type = 'Protests' AND week >= DATE '2025-01-01' AND week < DATE '2026-01-01'",
+    "additional_metadata": {
+      "endpoint": "generate-sql",
+      "must_use": [
+        "global_events"
+      ],
+      "notes": "Each global_events row is a weekly bundle: the answer is SUM(events) = 1,396, not COUNT(*) = 920. An index-friendly week range beats EXTRACT(YEAR FROM week). In the 3 November 5-run it failed every run, for real errors: EXTRACT(YEAR FROM week) in 4 of 5 (Query Performance 0.5: it stops the (country, week) index being used) and 'Protest' for 'Protests' in 2 (NULL: the plugin isn't shown event_type's values, which are text, not an enum)."
+    }
+  },
+  {
+    "name": "acled_region_most_civilian_fatalities_2023",
+    "input": "Which region had the most reported civilian fatalities in 2023, and how many were there?",
+    "expected_output": "SELECT c.region, SUM(r.fatalities) AS civilian_fatalities FROM acled.reported_civilian_fatalities r JOIN acled.countries c ON c.country = r.country WHERE r.year = 2023 GROUP BY c.region ORDER BY civilian_fatalities DESC LIMIT 1",
+    "additional_metadata": {
+      "endpoint": "generate-sql",
+      "must_use": [
+        "reported_civilian_fatalities"
+      ],
+      "notes": "Needs the join through countries for region. Fatalities in 'Violence against civilians' events in global_events are a different measure. The question asks for the total as well, so the answer has two columns: region and total.",
+      "regression": true
+    }
+  },
+  {
+    "name": "acled_fanout_demonstrations_with_months_of_violence_2024",
+    "input": "For each Western African country in 2024, show its demonstration events for the year and how many months of the year had any political violence.",
+    "expected_output": "SELECT d.country, d.events AS demonstration_events,\n  COUNT(p.month) AS months_with_political_violence\nFROM acled.demonstration_events_country d\nJOIN acled.countries c ON c.country = d.country\nLEFT JOIN acled.political_violence_country_month p\n  ON p.country = d.country AND p.year = d.year\nWHERE d.year = 2024 AND c.region = 'Western Africa'\nGROUP BY d.country, d.events",
+    "additional_metadata": {
+      "endpoint": "generate-sql",
+      "must_use": [
+        "demonstration_events_country",
+        "political_violence_country_month"
+      ],
+      "notes": "Fan-out (chasm) trap. Demonstrations are one row per country and year; political violence is one row per country and month. Joining them and then summing the demonstrations counts each country's yearly total once per month: Nigeria's 972 becomes 11,664, and 15 of the 16 rows change (only Cape Verde, with one month, is unaffected). The yearly figure must be grouped on or taken once (GROUP BY country, events, or MAX), or the months counted in a subquery. Every Western African country has a demonstrations row and at least one month of political violence in 2024, so inner and left joins give the same 16 rows; each monthly row has at least 1 event. Expected to pass most runs: the plugin kept separate grains apart when it aggregated each table on its own (acled_update_region_totals_by_month, every run), but here the natural single query joins the grains directly."
+    }
+  },
+  {
+    "name": "acled_busiest_month_with_ties_eastern_africa_2024",
+    "input": "For each Eastern African country, which month of 2024 had the most political violence events? Where months tie for the most, list all of them.",
+    "expected_output": "SELECT country, month\nFROM (\n  SELECT p.country, p.month, p.events,\n    RANK() OVER (PARTITION BY p.country ORDER BY p.events DESC) AS place\n  FROM acled.political_violence_country_month p\n  JOIN acled.countries c ON c.country = p.country\n  WHERE p.year = 2024 AND c.region = 'Eastern Africa'\n) ranked\nWHERE place = 1",
+    "additional_metadata": {
+      "endpoint": "generate-sql",
+      "must_use": [
+        "political_violence_country_month"
+      ],
+      "notes": "Top-1 per group with ties. RANK() (or comparing with each country's MAX) keeps every month tied for the most: 21 rows. DISTINCT ON, ROW_NUMBER() or one row per country keeps 17, dropping a tied month for Djibouti (March and June, 1 event each), Malawi (January and February, 10), Mayotte (February and June, 15) and Rwanda (January and October, 3). Countries with no political violence in 2024 have no monthly rows, so they don't appear. Expected to pass some runs: the request says to keep ties, but DISTINCT ON is the plugin's usual way to take one row per group (it used it in accelerate_first_week_of_event_type). The reference shows no events column: the question asks which month, not how many, so an answer without the count is right."
+    }
+  },
+  {
+    "name": "acled_region_totals_demonstrations_and_political_violence_2024",
+    "input": "For each region, what were the total demonstration events and the total political violence events in 2024? Count every country that had either.",
+    "expected_output": "WITH d AS (SELECT c.region, SUM(d.events) AS demonstration_events FROM acled.demonstration_events_country d JOIN acled.countries c ON c.country = d.country WHERE d.year = 2024 GROUP BY c.region), p AS (SELECT c.region, SUM(p.events) AS political_violence_events FROM acled.political_violence_year p JOIN acled.countries c ON c.country = p.country WHERE p.year = 2024 GROUP BY c.region) SELECT COALESCE(d.region, p.region) AS region, d.demonstration_events, p.political_violence_events FROM d FULL JOIN p ON p.region = d.region",
+    "additional_metadata": {
+      "endpoint": "generate-sql",
+      "must_use": [
+        "demonstration_events_country",
+        "countries"
+      ],
+      "notes": "Fan-out carried through a CTE: joining yearly demonstrations to the monthly political violence table on country, then totalling, inflates the figures roughly 9-12x while the row count can stay right. The reference totals each table before joining; SQL Result Match compares the values. 43 countries have only demonstrations and 12 only political violence in 2024, so totals must not be limited to countries in both."
+    }
+  },
+  {
+    "name": "clarify_how_bad_is_it",
+    "input": "How bad is it?",
+    "additional_metadata": {
+      "endpoint": "generate-sql",
+      "expect_clarification": true,
+      "ambiguity": "Nothing is settled: no place, no measure and no period, and in a fresh tab \"it\" refers to nothing. The data covers every country, in 18 regions (acled.countries), from 1997 to October 2026, and measures political violence events (political_violence_year), fatalities (reported_fatalities), civilian fatalities (reported_civilian_fatalities), events targeting civilians (events_targeting_civilians_country) and demonstrations (demonstration_events_country). The plugin should ask where the user means, since there is no sensible default for that; asking which measure and which period as well is reasonable here, not a fault, as long as it stays short. Measure options should be ones the tables have: events, fatalities, civilian fatalities. Answering with SQL, such as a world total for the latest year, is wrong.",
+      "readings": [
+        [
+          "countr",
+          "region",
+          "where",
+          "place",
+          "location"
+        ]
+      ],
+      "notes": "Step 1 of 3 on the clarification ladder, the vaguest: place, measure and period are all open. No reading_references, because no answer is a fair guess, so SQL here fails outright."
+    }
+  },
+  {
+    "name": "clarify_getting_worse_africa",
+    "input": "Is it getting worse in Africa?",
+    "additional_metadata": {
+      "endpoint": "generate-sql",
+      "expect_clarification": true,
+      "ambiguity": "The place is settled: Africa is the five African regions in acled.countries (Northern, Western, Middle, Eastern and Southern Africa). The measure and the period are not, and the answer turns on both. Data runs to the week of 10 October 2026, so 2026 is a part year. Comparing 2026 so far with the same weeks of 2025 (global_events), political violence events increased about 3% (27,282 to 28,118) while fatalities fell about 16% (63,171 to 52,921). Comparing the last two full years, 2024 to 2025, everything increased (political_violence_year 31,126 to 35,566 events; reported_fatalities 67,339 to 80,649). Comparing 2026's part year with all of 2025 in the yearly tables wrongly shows a fall. The plugin should ask which measure (events, fatalities or civilian fatalities) and which comparison (this year so far against the same point last year, or the last full year against the one before); one combined question or two short ones are both fine.",
+      "readings": [
+        [
+          "political violence",
+          "violent events",
+          "conflict events",
+          "number of (violent |conflict )?events",
+          "incidents"
+        ],
+        [
+          "fatalit",
+          "deaths",
+          "killed"
+        ],
+        [
+          "so far",
+          "year to date",
+          "same (point|period|weeks)",
+          "full year",
+          "last (two|2) (full )?years",
+          "2024",
+          "previous year",
+          "year before"
+        ]
+      ],
+      "notes": "Step 2 of 3: place settled, measure and period open. The partial 2026 is the trap: a naive year-on-year comparison shows improvement that isn't there.",
+      "reading_references": [
+        "SELECT EXTRACT(YEAR FROM week) AS year, SUM(events) AS political_violence_events FROM acled.global_events WHERE region LIKE '%Africa' AND disorder_type LIKE 'Political violence%' AND ((week >= DATE '2025-01-01' AND week <= DATE '2025-10-10') OR (week >= DATE '2026-01-01' AND week <= DATE '2026-10-10')) GROUP BY 1 ORDER BY 1",
+        "SELECT EXTRACT(YEAR FROM week) AS year, SUM(fatalities) AS fatalities FROM acled.global_events WHERE region LIKE '%Africa' AND ((week >= DATE '2025-01-01' AND week <= DATE '2025-10-10') OR (week >= DATE '2026-01-01' AND week <= DATE '2026-10-10')) GROUP BY 1 ORDER BY 1",
+        "SELECT p.year, SUM(p.events) AS events FROM acled.political_violence_year p JOIN acled.countries c ON c.country = p.country WHERE c.region LIKE '%Africa' AND p.year IN (2024, 2025) GROUP BY p.year ORDER BY p.year",
+        "SELECT f.year, SUM(f.fatalities) AS fatalities FROM acled.reported_fatalities f JOIN acled.countries c ON c.country = f.country WHERE c.region LIKE '%Africa' AND f.year IN (2024, 2025) GROUP BY f.year ORDER BY f.year"
+      ],
+      "compare_rows": false
+    }
+  },
+  {
+    "name": "clarify_most_dangerous_western_africa",
+    "input": "Which countries in Western Africa were the most dangerous in 2025?",
+    "additional_metadata": {
+      "endpoint": "generate-sql",
+      "expect_clarification": true,
+      "ambiguity": "\"Most dangerous\" has no single measure here. It could mean the most political violence events (political_violence_year), the most reported fatalities (reported_fatalities), or the most violence against civilians (reported_civilian_fatalities, events_targeting_civilians_country). The ranking depends on it: Nigeria is first on every measure, but second is Mali by political violence events (1,605) and Burkina Faso by fatalities (5,274 against Mali's 3,966), and Niger and Burkina Faso swap places on the civilian measures. Population is in wdi.wdi (World Bank), so a rate per person is a fair further option, though not needed. The plugin should ask which measure to rank by.",
+      "readings": [
+        [
+          "political violence",
+          "violent events",
+          "conflict events",
+          "number of (violent |conflict )?events",
+          "incidents"
+        ],
+        [
+          "fatalit",
+          "deaths",
+          "killed"
+        ]
+      ],
+      "notes": "Step 3 of 3, the least vague: place and year settled, the measure open behind a vague word. The ranking changes with the measure, so it should ask, or pick one and state it as an assumption: either passes, as the user sees the assumption beside the SQL. Its rows must then match that reading. Offering a per-capita option is fine now that wdi.wdi has World Bank population.",
+      "reading_references": [
+        "SELECT f.country, f.fatalities FROM acled.reported_fatalities f JOIN acled.countries c ON c.country = f.country WHERE c.region = 'Western Africa' AND f.year = 2025 ORDER BY f.fatalities DESC",
+        "SELECT p.country, p.events FROM acled.political_violence_year p JOIN acled.countries c ON c.country = p.country WHERE c.region = 'Western Africa' AND p.year = 2025 ORDER BY p.events DESC",
+        "SELECT f.country, f.fatalities FROM acled.reported_civilian_fatalities f JOIN acled.countries c ON c.country = f.country WHERE c.region = 'Western Africa' AND f.year = 2025 ORDER BY f.fatalities DESC"
+      ],
+      "compare_rows": false
+    }
+  },
+  {
+    "name": "cant_answer_deaths_per_capita",
+    "input": "Which admin1 regions of Nigeria had the most deaths per capita in 2024?",
+    "additional_metadata": {
+      "endpoint": "generate-sql",
+      "expect_cant_answer": true,
+      "missing": "There's no population for admin1 regions. wdi.wdi has World Bank population, but only for whole countries. GeoNames' gn_cities has populations of places, but adding them up isn't a region's population: only places of 500 or more people are listed, the figures are from different years, and the regions' names only partly match ACLED's. global_events.population_exposure is not population either: it's the number of people living near each week's events, counted again every week. The plugin should say it can't give a per-capita rate by admin1 region because that population is missing, and offer what the data can show: total fatalities per Nigerian admin1 region in 2024 (global_events), or Nigeria's deaths per capita as a whole (reported_fatalities with World Bank population). Offering summed place populations is acceptable only if it says plainly that they are a rough stand-in, not the regions' population.",
+      "notes": "Unanswerable: population exists only for whole countries (wdi.wdi). Until the linked datasets were loaded this asked about African countries, which WDI now answers, so it was moved down to admin1 regions. The traps are population_exposure, which looks like a population but isn't one, and summed GeoNames place populations passed off as a region's."
+    }
+  },
+  {
+    "name": "cant_answer_people_displaced_sudan",
+    "input": "How many people were displaced by the fighting in Sudan in 2025?",
+    "additional_metadata": {
+      "endpoint": "generate-sql",
+      "expect_cant_answer": true,
+      "missing": "Nothing records displacement in 2025. ACLED counts events and fatalities, not people who fled, and global_events.population_exposure counts people living near events, not people displaced. The World Bank data has displacement (wdi.wdi_wide, indicator VC.IDP.NWCV: new internal displacements from conflict and violence), but for Sudan only up to 2023 (6,039,000 that year), with nothing for 2024 or 2025. The plugin should say 2025's displacement isn't in the data, and may offer 2023's World Bank figure, labelled as 2023 and as new internal displacements, or what it can show for 2025: civilian fatalities (reported_civilian_fatalities), events targeting civilians (events_targeting_civilians_country), or people exposed to political violence, explained as exactly that.",
+      "notes": "Unanswerable for 2025: WDI's displacement figures stop at 2023. Traps: passing off population_exposure or fatalities as people displaced, or giving 2023's WDI figure as 2025's."
+    }
+  },
+  {
+    "name": "linked_ucdp_deaths_per_million_2024",
+    "input": "Which 10 countries had the most UCDP conflict deaths per million people in 2024? Use UCDP's best estimate of deaths and the World Bank's 2024 population. Show the country (GeoNames name), the deaths and the deaths per million, rounded to 1 decimal place.",
+    "expected_output": "SELECT ci.country, SUM(u.deaths_best) AS deaths,\n  round((SUM(u.deaths_best) * 1e6 / w.value)::numeric, 1) AS deaths_per_million\nFROM ucdp.ucdp_country_year u\nJOIN geo.country_info ci ON ci.gw_code = u.country_id\nJOIN wdi.wdi w ON w.iso3 = ci.iso3 AND w.indicator_code = 'SP.POP.TOTL' AND w.year = 2024\nWHERE u.year = 2024\nGROUP BY ci.country, w.value\nORDER BY deaths_per_million DESC\nLIMIT 10",
+    "additional_metadata": {
+      "endpoint": "generate-sql",
+      "notes": "Three sources with no shared key: UCDP's country_id is a Gleditsch-Ward code, which only geo.country_info.gw_code translates, then iso3 to wdi.wdi. Neither UCDP's country names nor ACLED's join to WDI directly. ucdp_country_year gives the same totals as ucdp_ged from about 4,000 rows instead of 418,000 (1.5 ms against 140 ms). UCDP files deaths in Gaza and the West Bank under Israel, hence Israel second. The bridge is visible to the plugin as the foreign key ucdp_ged.country_id -> geo.country_info.gw_code (added 5 November)."
+    }
+  },
+  {
+    "name": "linked_prefer_ucdp_summary_africa",
+    "input": "What were UCDP's best-estimate conflict deaths in its Africa region for each year from 2015 to 2024? Show the year and the deaths.",
+    "expected_output": "SELECT year, SUM(deaths_best) AS deaths FROM ucdp.ucdp_country_year WHERE region = 'Africa' AND year BETWEEN 2015 AND 2024 GROUP BY year ORDER BY year",
+    "additional_metadata": {
+      "endpoint": "generate-sql",
+      "must_not_use": [
+        "ucdp_ged"
+      ],
+      "waiting_on_plugin": true,
+      "notes": "Tests whether the plugin reads the optimised copy. ucdp.ucdp_country_year is a materialized view of ucdp_ged totalled by country, year and type of violence, with region, so it answers this from about 4,000 rows; ucdp_ged gives the same figures from 418,000 (54 ms against 2 ms). Fails if the SQL reads ucdp_ged. UCDP's Africa excludes Egypt and Libya (UCDP puts them in the Middle East), so ACLED's African regions give different totals. Waiting on the plugin (5 November): in production the plugin will be told which tables are rollups or faster than the raw tables, but it isn't yet, and that metadata shouldn't be given before then. Until it is, the plugin sees ucdp_country_year as a view with no row estimate and no indexes, so only the name says it's the smaller copy. Expect failures until then."
+    }
+  },
+  {
+    "name": "linked_sanctioned_people_per_acled_region",
+    "input": "For each ACLED region, how many different sanctioned people (OpenSanctions targets whose schema is Person) are linked to at least one of the region's countries? Count each person once per region, and leave out countries with no region.",
+    "expected_output": "SELECT c.region, COUNT(DISTINCT tc.target_id) AS sanctioned_people\nFROM acled.countries c\nJOIN opensanctions_public.os_target_countries tc ON tc.country_code = lower(c.iso2)\nJOIN opensanctions_public.os_targets t ON t.id = tc.target_id AND t.schema = 'Person'\nWHERE c.region IS NOT NULL\nGROUP BY c.region\nORDER BY sanctioned_people DESC",
+    "additional_metadata": {
+      "endpoint": "generate-sql",
+      "must_not_use": [
+        "os_country_counts"
+      ],
+      "notes": "The optimised copy is a trap here. os_country_counts counts a target once per country, so adding its counts across a region's countries counts a person linked to two of them twice (Europe 423,025 against 417,867). The answer needs COUNT(DISTINCT target_id) over os_target_countries (or the ;-separated os_targets.countries, unnested). OpenSanctions writes country codes in lower case, so the join is on lower(iso2). Seven small territories in acled.countries have no region."
+    }
+  },
+  {
+    "name": "linked_airports_many_foreign_destinations",
+    "input": "Which airports in countries with more than 5,000 ACLED reported fatalities in 2024 have direct routes to at least 20 different airports in other countries? Show each airport's ident, name and country code and its number of foreign destination airports, most first.",
+    "expected_output": "SELECT a.ident, a.name, a.iso_country, COUNT(DISTINCT l.dest_airport_ref) AS foreign_destinations\nFROM acled.reported_fatalities f\nJOIN acled.countries c ON c.country = f.country\nJOIN ourairports.oa_airports a ON a.iso_country = c.iso2\nJOIN openflights.of_route_legs l ON l.source_airport_ref = a.id AND l.dest_country <> l.source_country\nWHERE f.year = 2024 AND f.fatalities > 5000\nGROUP BY a.ident, a.name, a.iso_country\nHAVING COUNT(DISTINCT l.dest_airport_ref) >= 20\nORDER BY foreign_destinations DESC, a.ident",
+    "additional_metadata": {
+      "endpoint": "generate-sql",
+      "notes": "ACLED to airports through acled.countries.iso2 = oa_airports.iso_country, then OpenFlights routes by the resolved airport ids (source_airport_ref, dest_airport_ref), not the raw IATA codes. 'Different airports' means COUNT(DISTINCT destination), not routes: several airlines fly the same pair. of_route_legs (one row per airport pair, both countries included) and of_routes with two joins to oa_airports give the same 7 rows. OpenFlights is a 2014 snapshot, so Kyiv's airports still have routes."
+    }
+  },
+  {
+    "name": "linked_one_change_from_nairobi",
+    "input": "Using the OpenFlights routes, how many airports in each country can be reached from Nairobi (NBO) with exactly one change but not by a direct flight? Include Kenya, but don't count Nairobi itself. Show the country code and the number of airports, most first.",
+    "expected_output": "WITH nbo AS (\n  SELECT id FROM ourairports.oa_airports WHERE iata_code = 'NBO'\n),\none_change AS (\n  SELECT DISTINCT r2.dest_airport_ref AS airport_id\n  FROM openflights.of_routes r1\n  JOIN openflights.of_routes r2 ON r2.source_airport_ref = r1.dest_airport_ref\n  WHERE r1.source_airport_ref = (SELECT id FROM nbo)\n    AND r2.dest_airport_ref <> (SELECT id FROM nbo)\n)\nSELECT a.iso_country, COUNT(*) AS airports\nFROM one_change o\nJOIN ourairports.oa_airports a ON a.id = o.airport_id\nWHERE NOT EXISTS (\n  SELECT 1 FROM openflights.of_routes d\n  WHERE d.source_airport_ref = (SELECT id FROM nbo) AND d.dest_airport_ref = o.airport_id)\nGROUP BY a.iso_country\nORDER BY airports DESC, a.iso_country",
+    "additional_metadata": {
+      "endpoint": "generate-sql",
+      "notes": "Two hops over the route graph, minus the direct destinations and Nairobi. Every country, not the top 10, so the filters show in the rows: Kenya has 2 (Manda and Nairobi Wilson; Eldoret, Lodwar, Mombasa and Wajir are direct). Traps: leaving Nairobi in (it's reachable with a change by flying out and back) gives Kenya 3; leaving out every Kenyan airport (dest_country <> source_country) drops Kenya's row; both of the plugin's answers on 4 November did one or the other and still matched the old top 10. NOT IN over direct destinations that include NULL (a route whose airport couldn't be matched) returns nothing, so the NULLs must be left out or NOT EXISTS used; counting routes rather than distinct airports. Country is the destination airport's iso_country. 158 rows, 810 airports."
+    }
+  },
+  {
+    "name": "linked_acled_vs_ucdp_eastern_africa_2024",
+    "input": "For each Eastern African country with ACLED reported fatalities for 2024, show those fatalities and UCDP's best-estimate deaths for 2024, with 0 where UCDP recorded none.",
+    "expected_output": "SELECT c.country, f.fatalities AS acled_fatalities, COALESCE(u.deaths, 0) AS ucdp_deaths\nFROM acled.countries c\nJOIN acled.reported_fatalities f ON f.country = c.country AND f.year = 2024\nLEFT JOIN geo.country_info ci ON ci.iso = c.iso2\nLEFT JOIN (SELECT country_id, SUM(deaths_best) AS deaths\n           FROM ucdp.ucdp_country_year WHERE year = 2024 GROUP BY country_id) u\n  ON u.country_id = ci.gw_code\nWHERE c.region = 'Eastern Africa'\nORDER BY c.country",
+    "additional_metadata": {
+      "endpoint": "generate-sql",
+      "waiting_on_plugin": true,
+      "notes": "Two conflict datasets with different country keys. ACLED's country names go to ISO codes through acled.countries, then to UCDP's Gleditsch-Ward codes through geo.country_info.gw_code. Countries with no UCDP deaths, and Mayotte and Reunion, which have no gw_code, must stay in: a LEFT JOIN at each step and COALESCE, giving 18 rows. ucdp_country_year has a row per type of violence, so it must be summed per country before the join, or countries repeat (30 or 31 rows on 4 November). Joining on country names drops Ethiopia and others whose UCDP names differ. The question names only countries with an ACLED fatalities row, because the earlier wording ('each Eastern African country') also fitted keeping the one without, with 0. The bridge is visible to the plugin as the foreign key ucdp_ged.country_id -> geo.country_info.gw_code (added 5 November; a materialized view can't have one, so the plugin must carry it over to ucdp_country_year's country_id). Waiting on the plugin (5 November): it reads no indexes for materialized views and isn't given table descriptions, so it can't see that ucdp_country_year has several rows per country. Kept failing on purpose: it shows the plugin needs to check a table's grain before joining. Expect failures until the plugin changes."
+    }
+  }
+]

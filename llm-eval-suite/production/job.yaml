@@ -1,0 +1,95 @@
+# The suite as a Kubernetes Job, in Superset's namespace. It runs the smoke
+# goldens once and stops: the report is in the pod's log, and the Job fails
+# when any golden fails. Fill in the <...> values first.
+#
+# These are the steps in README.md, in this folder, with the same numbers;
+# README.md says more about each. All from this folder, in the namespace the
+# Job runs in:
+#
+#   1. Build the suite's image (../Dockerfile) and push it where the cluster
+#      pulls images from. The `..` is the suite's folder, which the image is
+#      built from:
+#        docker build -t <registry>/llm-eval-suite:<tag> \
+#          --build-arg BASE_IMAGE=<base image with Python 3.11> ..
+#        docker push <registry>/llm-eval-suite:<tag>
+#
+#   2. The settings: fill in settings.env, in this folder, then:
+#        kubectl create configmap llm-eval-suite-settings --from-env-file=settings.env
+#
+#   3. The certificates, as PEM files: the suite's client certificate and
+#      key, and the model server's CA (the plugin's NLSQL_LLM_CA_BUNDLE):
+#        kubectl create secret generic llm-eval-suite-certs \
+#          --from-file=client.pem=<certificate> --from-file=client.key=<key> \
+#          --from-file=ca.pem=<CA file>
+#
+#   4. Only if a setting is a secret: a file login.env holding it, deleted
+#      afterwards. That is JUDGE_CLIENT_KEY_PASSWORD=<password> for an
+#      encrypted key, the SUPERSET_HEADERS line when a header's value is a
+#      secret, or SUPERSET_PASSWORD=<password> with SUPERSET_AUTH=password.
+#      With none of these, skip this step:
+#        kubectl create secret generic llm-eval-suite-login --from-env-file=login.env
+#
+#   5. Put the image from step 1 on the `image:` line below, then:
+#        kubectl apply -f job.yaml
+#        kubectl logs -f job/llm-eval-suite
+#
+#   6. The report is the last thing in the log. Its top line is the result:
+#        kubectl logs job/llm-eval-suite | grep "questions passed"
+#
+# To run it again, delete the Job (kubectl delete job llm-eval-suite) and
+# apply it again. To run something other than the smoke goldens, change
+# `args`: they are run_evals.sh's arguments, e.g. ["sql", "--runs", "3"].
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: llm-eval-suite
+spec:
+  # A failed run is reported, not retried: a retry would ask every question
+  # again.
+  backoffLimit: 0
+  # A run that hasn't finished in an hour is stopped.
+  activeDeadlineSeconds: 3600
+  # The finished Job, and its pod's log, are kept for a day.
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: suite
+          image: <registry>/llm-eval-suite:<tag>
+          args: ["smoke"]
+          envFrom:
+            - configMapRef:
+                name: llm-eval-suite-settings
+            # Step 4's Secret: the Job runs without it when there is none.
+            - secretRef:
+                name: llm-eval-suite-login
+                optional: true
+          volumeMounts:
+            # Where the settings look for the certificate files
+            # (JUDGE_CLIENT_CERT and the others).
+            - name: certs
+              mountPath: /certs
+              readOnly: true
+            # The run's result files. The report is in the log too; to keep
+            # the files after the pod has gone, use a PersistentVolumeClaim
+            # here instead.
+            - name: results
+              mountPath: /suite/results
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              memory: 1Gi
+      volumes:
+        - name: certs
+          secret:
+            secretName: llm-eval-suite-certs
+            # Readable by the pod's user and its group (the root group, as
+            # the image runs), and no one else.
+            defaultMode: 0440
+        - name: results
+          emptyDir: {}

@@ -1,0 +1,83 @@
+[
+  {
+    "name": "breakdown_rollup_region_and_country_subtotals",
+    "input": "SELECT region, country, SUM(fatalities) AS fatalities\nFROM acled.global_events\nWHERE week >= DATE '2025-01-01' AND week < DATE '2026-01-01'\n  AND region IN ('Eastern Africa', 'Middle Africa')\nGROUP BY ROLLUP (region, country)\nORDER BY region NULLS LAST, country NULLS LAST",
+    "additional_metadata": {
+      "endpoint": "describe-breakdown",
+      "notes": "Fatalities in 2025 for each Eastern and Middle African country, with a subtotal for each region and a grand total. GROUP BY ROLLUP adds rows a plain GROUP BY wouldn't: one per region with country NULL (its subtotal), and one with both NULL (the grand total). NULLS LAST puts each region's subtotal after its countries and the grand total last. 31 rows: 28 countries, 2 subtotals, 1 total. A breakdown must explain the extra rows and what the NULLs mean; country is never NULL in the data, so a NULL always marks a total."
+    }
+  },
+  {
+    "name": "breakdown_chained_ctes_with_ranking",
+    "input": "WITH weekly AS (\n  SELECT country, week, SUM(fatalities) AS fatalities\n  FROM acled.global_events\n  WHERE event_type = 'Battles'\n  GROUP BY country, week\n),\nyearly AS (\n  SELECT country, EXTRACT(YEAR FROM week) AS year,\n    SUM(fatalities) AS fatalities, MAX(fatalities) AS worst_week\n  FROM weekly\n  GROUP BY country, EXTRACT(YEAR FROM week)\n),\nranked AS (\n  SELECT country, year, fatalities, worst_week,\n    RANK() OVER (PARTITION BY year ORDER BY fatalities DESC) AS rank_in_year\n  FROM yearly\n)\nSELECT country, year, fatalities, worst_week, rank_in_year\nFROM ranked\nWHERE rank_in_year <= 5\nORDER BY year, rank_in_year",
+    "additional_metadata": {
+      "endpoint": "describe-breakdown",
+      "notes": "Three chained CTEs then a filter on the ranking: sections in order, each described correctly."
+    }
+  },
+  {
+    "name": "breakdown_new_high_weeks_share_of_region",
+    "input": "WITH weekly AS (\n  SELECT country, week, SUM(events) AS events\n  FROM acled.global_events\n  WHERE event_type = 'Explosions/Remote violence'\n    AND week >= DATE '2025-01-01' AND week < DATE '2026-01-01'\n  GROUP BY country, week\n),\nflagged AS (\n  SELECT country, week, events,\n    MAX(events) OVER (\n      PARTITION BY country ORDER BY week\n      ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING\n    ) AS prior_max\n  FROM weekly\n)\nSELECT c.region,\n  COUNT(DISTINCT c.country) AS countries,\n  COUNT(f.week) AS new_high_weeks,\n  COUNT(DISTINCT f.country) * 100 / COUNT(DISTINCT c.country) AS pct_countries_with_new_high\nFROM acled.countries c\nLEFT JOIN flagged f\n  ON f.country = c.country\n AND f.events > f.prior_max\nGROUP BY c.region\nORDER BY pct_countries_with_new_high DESC, c.region NULLS LAST",
+    "additional_metadata": {
+      "endpoint": "describe-breakdown",
+      "notes": "For each region: how many countries it has, how many weeks of 2025 a country set a new high for explosion/remote violence events, and the percentage of its countries that set at least one. weekly totals each country's explosion events per week of 2025, with a row only for weeks that had some. In flagged the window ends one row before the current one, so prior_max is the most of any earlier such week; the ON clause keeps a week only if it beat that strictly, so a country's first week (prior_max NULL) never counts and equalling the high doesn't either: Guatemala's four weeks of 1 event and Syria's second week of 128 after 128 are no new highs. 110 new-high weeks in 51 countries; counting first weeks gives 199 in all 89 countries with explosions, and >= gives 249. The LEFT JOIN with that test in ON keeps every country (251), so COUNT(DISTINCT c.country) is all of a region's countries and COUNT(f.week) is 0 for one without a new high (COUNT(*) would count 1): the percentage is of all countries, not of those with explosions (Middle East 9 of 15 is 60, not 9 of 11). Integer division rounds the percentage down: Northern Africa's 4 of 6 is 66, not 67. Countries with no region form a group of their own (7 countries, 0), sorted last among the 0s. 19 rows."
+    }
+  },
+  {
+    "name": "breakdown_case_buckets_with_subquery",
+    "input": "SELECT country, fatalities,\n  CASE\n    WHEN fatalities >= 1000 THEN 'High'\n    WHEN fatalities >= 100 THEN 'Medium'\n    ELSE 'Low'\n  END AS fatality_level\nFROM acled.reported_fatalities\nWHERE year = 2024\n  AND country IN (SELECT country FROM acled.countries WHERE region = 'Western Africa')\nORDER BY fatalities DESC",
+    "additional_metadata": {
+      "endpoint": "describe-breakdown",
+      "notes": "Explains the three categories and the Western Africa filter.",
+      "regression": true
+    }
+  },
+  {
+    "name": "breakdown_spike_weeks_window_before_current",
+    "input": "WITH weekly AS (\n  SELECT country, week, SUM(events) AS events\n  FROM acled.global_events\n  WHERE region = 'Middle East'\n    AND week >= DATE '2025-01-01'\n  GROUP BY country, week\n),\nwith_prior AS (\n  SELECT country, week, events,\n    AVG(events) OVER (\n      PARTITION BY country ORDER BY week\n      ROWS BETWEEN 3 PRECEDING AND 1 PRECEDING\n    ) AS prior_avg\n  FROM weekly\n)\nSELECT country, week, events, ROUND(prior_avg, 1) AS prior_avg\nFROM with_prior\nWHERE events > 2 * prior_avg\nORDER BY country, week",
+    "additional_metadata": {
+      "endpoint": "describe-breakdown",
+      "notes": "Weeks in which a Middle East country had more than twice the average of its previous three weeks of events, since 2025. The window ends one row before the current one, so a week is compared with the weeks before it; a country's first week has no average, so it never counts; and the three rows are the previous weeks with events, not necessarily the previous three calendar weeks. 61 rows."
+    }
+  },
+  {
+    "name": "breakdown_union_and_correlated_having",
+    "input": "SELECT c.region, COUNT(*) AS busy_countries\nFROM (\n  SELECT country FROM acled.demonstration_events_country\n  WHERE year = 2024 AND events > 500\n  UNION\n  SELECT country FROM acled.political_violence_year\n  WHERE year = 2024 AND events > 500\n) busy\nJOIN acled.countries c ON c.country = busy.country\nGROUP BY c.region\nHAVING COUNT(*) > (\n  SELECT COUNT(*) / 4.0\n  FROM acled.countries c2\n  WHERE c2.region = c.region\n)\nORDER BY busy_countries DESC",
+    "additional_metadata": {
+      "endpoint": "describe-breakdown",
+      "notes": "Regions where more than a quarter of the countries were 'busy' in 2024: over 500 demonstration events or over 500 political violence events. UNION, not UNION ALL, so a country busy in both counts once (66 countries, not 80 rows). The HAVING subquery is correlated: it counts the countries of each region in turn, so the threshold differs by region. 8 regions."
+    }
+  },
+  {
+    "name": "breakdown_lateral_top3_weeks_per_country",
+    "input": "SELECT c.country, t.week, t.fatalities\nFROM acled.countries c\nCROSS JOIN LATERAL (\n  SELECT g.week, SUM(g.fatalities) AS fatalities\n  FROM acled.global_events g\n  WHERE g.country = c.country\n    AND g.week >= DATE '2025-01-01'\n  GROUP BY g.week\n  ORDER BY fatalities DESC\n  LIMIT 3\n) t\nWHERE c.region = 'Eastern Africa'\nORDER BY c.country, t.fatalities DESC",
+    "additional_metadata": {
+      "endpoint": "describe-breakdown",
+      "notes": "Each Eastern African country's three deadliest weeks since the start of 2025. The LATERAL subquery runs once per country; CROSS JOIN LATERAL would drop a country with no events since 2025 (none in Eastern Africa today); ties at the third week are broken arbitrarily. 57 rows."
+    }
+  },
+  {
+    "name": "breakdown_filter_share_with_nullif",
+    "input": "WITH totals AS (\n  SELECT country,\n    SUM(fatalities) AS fatalities,\n    COALESCE(SUM(fatalities) FILTER (WHERE event_type = 'Violence against civilians'), 0) AS civilian_fatalities\n  FROM acled.global_events\n  WHERE country IN ('Sudan', 'Myanmar', 'Mexico', 'Nigeria', 'Ukraine', 'Haiti')\n    AND week >= DATE '2025-01-01' AND week < DATE '2026-01-01'\n  GROUP BY country\n)\nSELECT country, fatalities, civilian_fatalities,\n  ROUND(100.0 * civilian_fatalities / NULLIF(fatalities, 0), 1) AS civilian_share\nFROM totals\nORDER BY civilian_share DESC NULLS LAST",
+    "additional_metadata": {
+      "endpoint": "describe-breakdown",
+      "notes": "Six countries' 2025 fatalities, those from violence against civilians, and that share as a percentage. FILTER sums only the violence-against-civilians rows while fatalities still counts every event type, so it is a share of all deaths (a WHERE on the event type would make both columns the same: Ukraine's 78,121 would become 86). COALESCE makes a country with no such rows 0 rather than NULL; NULLIF stops a division by zero, leaving the share NULL for a country with no fatalities, and NULLS LAST sorts those last. Neither guard fires today: all six have fatalities. 6 rows, from Mexico (80.4%) to Ukraine (0.1%)."
+    }
+  },
+  {
+    "name": "breakdown_not_in_with_null_in_the_list",
+    "input": "SELECT DISTINCT region\nFROM acled.countries\nWHERE region NOT IN (\n  SELECT c.region\n  FROM acled.countries c\n  WHERE NOT EXISTS (\n    SELECT 1 FROM acled.reported_fatalities r\n    WHERE r.country = c.country AND r.year = 2024\n  )\n)\nORDER BY region",
+    "additional_metadata": {
+      "endpoint": "describe-breakdown",
+      "notes": "Meant as the regions in which every country has a 2024 reported-fatalities record: the subquery lists the regions of countries with no 2024 record, and NOT IN keeps the other regions. But it returns no rows: 7 of the 33 countries with no 2024 record have no region, so the list contains NULL, and NOT IN against a list containing NULL is never true. Written with NOT EXISTS, or with region IS NOT NULL in the subquery, it returns 9 regions. A breakdown that says it finds the regions where every country has a record, without the NULL problem, describes a result the query never gives."
+    }
+  },
+  {
+    "name": "breakdown_join_actors_sanctions",
+    "input": "WITH sides AS (\n  SELECT side_a AS side FROM ucdp.ucdp_ged WHERE country_id = 626 AND year = 2024\n  UNION\n  SELECT side_b FROM ucdp.ucdp_ged WHERE country_id = 626 AND year = 2024\n)\nSELECT s.side, m.side IS NOT NULL AS on_sanctions_list\nFROM sides s\nLEFT JOIN (\n  SELECT DISTINCT s2.side\n  FROM sides s2\n  JOIN opensanctions_public.os_targets t ON lower(t.name) = lower(s2.side)\n) m ON m.side = s.side\nORDER BY s.side",
+    "additional_metadata": {
+      "endpoint": "describe-breakdown",
+      "notes": "Every actor (side_a or side_b) in South Sudan's 2024 UCDP events, and whether a sanctioned target has exactly the same name, ignoring case. The CTE lists the actors once each (UNION removes duplicates). The subquery joins them to os_targets on lower(name) = lower(side), and DISTINCT keeps each matched actor once however many targets share its name. The LEFT JOIN keeps actors with no match, and m.side IS NOT NULL turns that into true or false. 19 rows, all false today: the sanctions list names these parties differently. A breakdown must say the match is on the exact name (case aside), not a similar one, and why actors with no match still appear. Plain PostgreSQL: an earlier version used pg_trgm's % and similarity(), which a plain PostgreSQL database doesn't have."
+    }
+  }
+]

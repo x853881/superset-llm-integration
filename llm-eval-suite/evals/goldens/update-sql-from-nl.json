@@ -1,0 +1,67 @@
+[
+  {
+    "name": "acled_update_top5_fatalities_to_2024_with_civilian",
+    "input": "Which 5 countries had the most reported fatalities in 2024, and how many reported civilian fatalities did each have?",
+    "expected_output": "SELECT f.country, f.fatalities, c.fatalities AS civilian_fatalities FROM acled.reported_fatalities f LEFT JOIN acled.reported_civilian_fatalities c ON c.country = f.country AND c.year = f.year WHERE f.year = 2024 ORDER BY f.fatalities DESC LIMIT 5",
+    "additional_metadata": {
+      "endpoint": "update-sql-from-nl",
+      "previous_input": "Which 5 countries had the most reported fatalities in 2023?",
+      "previous_sql": "SELECT country, fatalities FROM acled.reported_fatalities WHERE year = 2023 ORDER BY fatalities DESC LIMIT 5",
+      "must_use": [
+        "reported_fatalities",
+        "reported_civilian_fatalities"
+      ],
+      "notes": "Changes the year and adds a join on (country, year), keeping the top-5 shape. 2024 top 5: Ukraine, Palestine, Myanmar, Sudan, Nigeria (no ties at 5th). Worded as the whole edited request, as the plugin is told the request has changed to this text (not as a chat-style follow-up)."
+    }
+  },
+  {
+    "name": "acled_update_show_every_year",
+    "input": "Reported fatalities in Ukraine for every year",
+    "expected_output": "SELECT year, fatalities FROM acled.reported_fatalities WHERE country = 'Ukraine'",
+    "additional_metadata": {
+      "endpoint": "update-sql-from-nl",
+      "previous_input": "Reported fatalities in Ukraine in 2023",
+      "previous_sql": "SELECT fatalities FROM acled.reported_fatalities WHERE country = 'Ukraine' AND year = 2023",
+      "notes": "The request box edited from 2023 to every year: the plugin is told the request has changed to this text, so it is the whole revised question, not a follow-up. Removes the year condition and adds the year column so the rows can be told apart.",
+      "regression": true
+    }
+  },
+  {
+    "name": "acled_update_region_totals_by_month",
+    "input": "Political violence events per region per month in 2024, with months shown by name, alongside each region's total demonstration events for the year",
+    "expected_output": "WITH d AS (SELECT c.region, SUM(d.events) AS demonstration_events FROM acled.demonstration_events_country d JOIN acled.countries c ON c.country = d.country WHERE d.year = 2024 GROUP BY c.region), p AS (SELECT c.region, p.month, SUM(p.events) AS political_violence_events FROM acled.political_violence_country_month p JOIN acled.countries c ON c.country = p.country WHERE p.year = 2024 GROUP BY c.region, p.month) SELECT p.region, p.month, p.political_violence_events, d.demonstration_events FROM p JOIN d ON d.region = p.region",
+    "additional_metadata": {
+      "endpoint": "update-sql-from-nl",
+      "previous_input": "Total demonstration events per region in 2024",
+      "previous_sql": "WITH demos AS (\n  SELECT c.region, SUM(d.events) AS demonstration_events\n  FROM acled.demonstration_events_country d\n  JOIN acled.countries c ON c.country = d.country\n  WHERE d.year = 2024\n  GROUP BY c.region\n)\nSELECT region, demonstration_events FROM demos",
+      "notes": "Fan-out carried through a CTE: joining yearly demonstrations to the monthly political violence table on country, then totalling, inflates the figures roughly 9-12x while the row count can stay right. The reference totals each table before joining; SQL Result Match compares the values. Here the fanned-out version returns the same 192 rows as the reference, so only the values show the mistake. Worded as the whole edited request, as the plugin is told the request has changed to this text (not as a chat-style follow-up). Months are asked for by name so a correct answer matches the reference, which has month names."
+    }
+  },
+  {
+    "name": "acled_update_middle_east_civilian_share",
+    "input": "Political violence events in each Middle East country in 2024, most first, with how many of them targeted civilians (0 where none were recorded) and that as a percentage of the country's political violence events, to one decimal place",
+    "expected_output": "SELECT p.country, p.events AS political_violence_events, COALESCE(t.events, 0) AS civilian_targeting_events, ROUND(100.0 * COALESCE(t.events, 0) / p.events, 1) AS civilian_targeting_pct\nFROM acled.political_violence_year p\nJOIN acled.countries c ON c.country = p.country\nLEFT JOIN acled.events_targeting_civilians_country t ON t.country = p.country AND t.year = p.year\nWHERE p.year = 2024 AND c.region = 'Middle East'\nORDER BY p.events DESC",
+    "additional_metadata": {
+      "endpoint": "update-sql-from-nl",
+      "regression": true,
+      "previous_input": "Political violence events in each Middle East country in 2024, most first",
+      "previous_sql": "SELECT p.country, p.events AS political_violence_events\nFROM acled.political_violence_year p\nJOIN acled.countries c ON c.country = p.country\nWHERE p.year = 2024 AND c.region = 'Middle East'\nORDER BY p.events DESC",
+      "must_use": [
+        "political_violence_year",
+        "events_targeting_civilians_country"
+      ],
+      "notes": "Several traps in one edit. Jordan had 8 political violence events in 2024 but has no row in events_targeting_civilians_country, so: an inner join, or a LEFT JOIN with the civilian table's year in the WHERE (t.year = 2024), drops it (12 rows instead of 13); a LEFT JOIN without COALESCE shows NULL instead of 0 and 0.0. Integer division is the other trap: t.events / p.events gives 0 for every country but Saudi Arabia and the UAE (100%), and 100 * t.events / p.events truncates (Palestine 37 instead of 37.3, Syria 22 instead of 22.8): 9 of the 13 rows differ, as only Oman (80%), Saudi Arabia, the UAE and Jordan come out whole. The region filter and most-first order must be kept. Reference: Palestine 18,513 events, 6,899 targeting civilians, 37.3%; Jordan 8, 0, 0.0. 13 rows. Worded as the whole edited request."
+    }
+  },
+  {
+    "name": "acled_update_sudan_monthly_change",
+    "input": "Political violence events in Sudan per month in 2023, with the change from the previous month (blank for January)",
+    "expected_output": "SELECT month, events, events - LAG(events) OVER (ORDER BY to_date(month, 'FMMonth')) AS change FROM acled.political_violence_country_month WHERE country = 'Sudan' AND year = 2023",
+    "additional_metadata": {
+      "endpoint": "update-sql-from-nl",
+      "previous_input": "Political violence events per country in 2023",
+      "previous_sql": "SELECT country, events FROM acled.political_violence_year WHERE year = 2023",
+      "notes": "Harder version of the break-down-by-month golden: switch to the monthly table, narrow to Sudan and add a month-on-month change. Trap: month is stored as text ('January'), so ordering by it is alphabetical and every change comes out wrong; the window needs calendar order (to_date(month, 'FMMonth'), EXTRACT or a CASE). 12 rows; January's change is NULL. No country column: the request is about Sudan alone, and the plugin leaves it out. Worded as the whole edited request."
+    }
+  }
+]

@@ -1,0 +1,51 @@
+[
+  {
+    "name": "explain_plan_primary_key_lookup",
+    "input": "SELECT country, week, event_type, events, fatalities\nFROM acled.global_events\nWHERE event_row_id = 482117",
+    "additional_metadata": {
+      "endpoint": "explain-plan",
+      "notes": "The easiest plan: an Index Scan on the primary key, estimated at exactly 1 row and a cost of about 8. A good explanation says the key finds the single row directly and there is nothing to improve. Kept to catch the plugin getting worse at the basics.",
+      "regression": true
+    }
+  },
+  {
+    "name": "explain_plan_full_scan_unindexed_filter",
+    "input": "SELECT country, admin1, week, fatalities\nFROM acled.global_events\nWHERE fatalities > 100",
+    "additional_metadata": {
+      "endpoint": "explain-plan",
+      "notes": "fatalities has no index, so the plan is a parallel full scan of ~1M rows, estimated to keep about 3,105. An index on fatalities is the right suggestion here. Answers lose points for leaving out the plan's numbers."
+    }
+  },
+  {
+    "name": "explain_plan_small_table_needs_no_index",
+    "input": "SELECT country, iso3\nFROM acled.countries\nWHERE region = 'Western Africa'\nORDER BY country",
+    "additional_metadata": {
+      "endpoint": "explain-plan",
+      "notes": "A Seq Scan of the 251-row countries table, keeping about 16 rows at a cost of about 5, then a sort of those 16. There is no index on region and none is needed: on a table this small a full scan is the cheapest way to read it. The trap is the habit of suggesting an index whenever a filtered column has none; nothing in this plan calls for one."
+    }
+  },
+  {
+    "name": "explain_plan_fatalities_by_country_2024",
+    "input": "SELECT country, SUM(fatalities) AS fatalities FROM acled.global_events WHERE week >= DATE '2024-01-01' AND week < DATE '2025-01-01' GROUP BY country",
+    "additional_metadata": {
+      "endpoint": "explain-plan",
+      "notes": "The week index (bitmap scan) with parallel workers and a two-stage aggregate. Trap: a step's cost is cumulative, including everything below it, so the Sort and aggregates look expensive (about 23k) but add little; the bitmap heap scan is where the cost is. Rows are estimates (≈42k), not counts."
+    }
+  },
+  {
+    "name": "explain_plan_hash_join_by_region",
+    "input": "SELECT c.region, SUM(g.fatalities) AS fatalities\nFROM acled.global_events g\nJOIN acled.countries c ON c.country = g.country\nGROUP BY c.region",
+    "additional_metadata": {
+      "endpoint": "explain-plan",
+      "notes": "Hash join of the big table to countries, with a two-stage parallel aggregate. Traps: rows under Gather are per worker (≈417k each, of ~1M in the table), and the (country, week) index already exists, so suggesting an index on country is wrong; with no filter, the full scan is unavoidable."
+    }
+  },
+  {
+    "name": "explain_plan_subquery_per_row",
+    "input": "SELECT y.country, y.year, y.events,\n  (SELECT SUM(g.fatalities)\n   FROM acled.global_events g\n   WHERE g.country = y.country\n     AND EXTRACT(YEAR FROM g.week) = y.year) AS weekly_fatalities\nFROM acled.political_violence_year y",
+    "additional_metadata": {
+      "endpoint": "explain-plan",
+      "notes": "SubPlan run once per row of political_violence_year (2,767 times); that is where the cost is. Traps: it is a SubPlan, not a nested loop; EXTRACT(YEAR FROM week) stops the (country, week) index narrowing on week, and a week range would let it, so no new index is needed."
+    }
+  }
+]

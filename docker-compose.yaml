@@ -1,0 +1,110 @@
+# Superset with this extension, for development and for the acceptance tests (e2e/).
+#
+#   superset    Superset 6.1 on http://localhost:8088 (admin / admin), with this repo loaded from disk
+#   postgres    The "Warehouse" database analysts query in SQL Lab (the example data stays in SQLite)
+#   stand-in    Stands in for the LLM (OpenRouter). Superset always talks to it, never to OpenRouter.
+#   phoenix     Optional: Arize Phoenix, to see every LLM call as a trace (see below)
+#
+# Usage:
+#   docker compose up            # starts everything (needs OPENROUTER_API_KEY in .env)
+#   superset-extensions dev      # in another terminal, on your host, in this repo
+#
+# By default the stand-in passes every request through to OpenRouter. The acceptance tests switch it
+# to replaying recordings (cd e2e && npm run harness:up); see e2e/README.md.
+#
+# Compose reads .env from this folder, the same file the Playwright config reads, so the key, the
+# admin's credentials and the ports are set in one place (see .env.example).
+
+services:
+  superset:
+    # apache/superset:6.1.0 with frontend fixes and the Postgres driver: see dev/superset/README.md
+    build: ./dev/superset
+    ports:
+      - "${SUPERSET_PORT:-8088}:8088"
+    environment:
+      SUPERSET_CONFIG_PATH: /app/dev/superset_config.py
+      FLASK_DEBUG: "1"
+      ADMIN_USERNAME: ${SUPERSET_USERNAME:-admin}
+      ADMIN_PASSWORD: ${SUPERSET_PASSWORD:-admin}
+      LOAD_EXAMPLES: ${LOAD_EXAMPLES:-yes}
+      # dev: Flask's dev server with auto-reload; gunicorn: Superset's production server (the tests)
+      SUPERSET_SERVER: ${SUPERSET_SERVER:-dev}
+      # The plugin's LLM is the stand-in, never OpenRouter directly (deploy/superset_config_docker.py
+      # reads these). The stand-in sets the real key, so Superset only has a dummy: long and unlikely,
+      # because the stand-in refuses to write a recording containing any Authorization value it has
+      # seen, and a short one could turn up in a prompt by chance.
+      NLSQL_LLM_BASE_URL: http://stand-in:8080/api/v1
+      NLSQL_EMBEDDING_BASE_URL: http://stand-in:8080/api/v1
+      NLSQL_LLM_API_KEY: waxwing-ui-testing-dummy-key-7c41e9a0b35f4d62
+      # The bundled semantic schema describes the example datasets, so use it here. The acceptance
+      # tests turn it off, so they don't need embeddings recorded.
+      NLSQL_SEMANTIC_SCHEMA_ENABLED: ${NLSQL_SEMANTIC_SCHEMA_ENABLED:-true}
+      # e.g. http://phoenix:6006 when started with `--profile phoenix`
+      NLSQL_PHOENIX_ENDPOINT: ${NLSQL_PHOENIX_ENDPOINT:-}
+    volumes:
+      # Dev config + startup script
+      - ./dev/superset_config.py:/app/dev/superset_config.py:ro
+      # The plugin's settings, on Superset's PYTHONPATH, as in Superset's own docker setup
+      - ./deploy/superset_config_docker.py:/app/pythonpath/superset_config_docker.py:ro
+      - ./dev/start.sh:/app/dev/start.sh:ro
+      - ./e2e/harness/superset/register_warehouse.py:/app/dev/register_warehouse.py:ro
+      # This repo, loaded from disk via LOCAL_EXTENSIONS
+      - ./:/app/extensions/nltosqlandback
+      # Persist the SQLite metadata DB between restarts
+      - superset_home:/app/superset_home
+    command: ["bash", "/app/dev/start.sh"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8088/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 900s # migrations, `superset init` and the example data on a fresh volume
+    depends_on:
+      postgres:
+        condition: service_healthy
+      stand-in:
+        condition: service_healthy
+
+  # The "Warehouse" database analysts query in SQL Lab: empty, so each test creates the tables it
+  # needs. Superset registers it on start-up (e2e/harness/superset/register_warehouse.py).
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: superset
+      POSTGRES_PASSWORD: superset
+      POSTGRES_DB: superset
+    volumes:
+      - ./e2e/harness/postgres:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U superset -d warehouse"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # Stands in for the LLM: passes everything through to OpenRouter (the default), records what's
+  # missing, or replays the recordings in e2e/tests/recordings. See e2e/stand-in/README.md.
+  stand-in:
+    build: ./e2e/stand-in
+    ports:
+      - "${STAND_IN_PORT:-8080}:8080" # the tests reach the control channel here
+    environment:
+      STAND_IN_MODE: ${STAND_IN_MODE:-pass-through}
+      ALLOW_RECORDING: ${ALLOW_RECORDING:-true}
+      UPSTREAM_API_KEY: ${OPENROUTER_API_KEY:-} # only read when passing through or recording
+    volumes:
+      - ./e2e/tests/recordings:/recordings # read-write: recordings land in the working tree
+      - ./e2e/harness/stand-in.yaml:/config/stand-in.yaml:ro
+    # On Linux, if your uid isn't 1000, uncomment to run as yourself (see e2e/stand-in/README.md):
+    # user: "${UID:-1000}:${GID:-1000}"
+
+  # Optional: Arize Phoenix, to see every LLM call as a trace. Start with
+  #   NLSQL_PHOENIX_ENDPOINT=http://phoenix:6006 docker compose --profile phoenix up
+  # and open http://localhost:6006.
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    profiles: ["phoenix"]
+    ports:
+      - "6006:6006"
+
+volumes:
+  superset_home:

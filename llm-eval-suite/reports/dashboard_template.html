@@ -1,0 +1,983 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eval Run Comparison</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --border: rgba(11,11,11,0.10);
+  --warn-bg: #fff4dc;
+  --warn-ink: #6b4a00;
+  --chip: #eeede8;
+  --pass: #2f8a2b;
+  --fail: #c93a39;
+  --tier-a: #2f8a2b;
+  --tier-b: #8a6a00;
+  --tier-c: #b85410;
+  --tier-d: #c93a39;
+  --ins: #cdebc9;
+  --del: #f6d3d1;
+  --link: #1d5bb8;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --ink: #f0efec;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --border: rgba(255,255,255,0.10);
+    --warn-bg: #3a2c0a;
+    --warn-ink: #f6d58a;
+    --chip: #2c2c2a;
+    --pass: #5cc657;
+    --fail: #f06a67;
+    --tier-a: #5cc657;
+    --tier-b: #e2b93b;
+    --tier-c: #f0904b;
+    --tier-d: #f06a67;
+    --ins: #1f4d21;
+    --del: #5c2624;
+    --link: #8ab4ff;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --ink: #f0efec;
+  --ink-2: #c3c2b7;
+  --muted: #898781;
+  --grid: #2c2c2a;
+  --border: rgba(255,255,255,0.10);
+  --warn-bg: #3a2c0a;
+  --warn-ink: #f6d58a;
+  --chip: #2c2c2a;
+  --pass: #5cc657;
+  --fail: #f06a67;
+  --tier-a: #5cc657;
+  --tier-b: #e2b93b;
+  --tier-c: #f0904b;
+  --tier-d: #f06a67;
+  --ins: #1f4d21;
+  --del: #5c2624;
+  --link: #8ab4ff;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--page); color: var(--ink);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+main { overflow-wrap: anywhere; max-width: 1240px; margin: 0 auto; padding: 24px 16px 64px; }
+h1 { font-size: 22px; margin: 0 0 4px; }
+h2 { font-size: 16px; margin: 36px 0 4px; scroll-margin-top: 12px; }
+.sub { color: var(--ink-2); margin: 0 0 12px; }
+.muted { color: var(--muted); }
+:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+.top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px 20px; flex-wrap: wrap; }
+.top > div { flex: 1 1 420px; min-width: 0; }
+.btn {
+  font: inherit; font-size: 13px; padding: 7px 12px; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface); color: var(--ink); white-space: nowrap;
+}
+.btn:hover { background: var(--chip); }
+.btn.small { padding: 3px 9px; font-size: 12.5px; }
+.linkish {
+  border: 0; background: none; padding: 0; font: inherit; color: var(--link); cursor: pointer;
+  text-align: left; text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere;
+}
+#copyFallback { width: 100%; min-height: 160px; margin-top: 10px; font: 12px/1.4 ui-monospace, Menlo, monospace;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-radius: 8px; padding: 8px; }
+.warn {
+  overflow-wrap: anywhere;
+  background: var(--warn-bg); color: var(--warn-ink); border-radius: 8px;
+  padding: 10px 14px; margin: 12px 0; font-size: 13px;
+}
+.warn .linkish { color: inherit; }
+.warn details summary { cursor: pointer; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 16px; }
+.stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+.stat .k { color: var(--ink-2); font-size: 12px; }
+.stat .v { font-size: 26px; font-weight: 600; margin-top: 2px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.stat .d { font-size: 13px; color: var(--ink-2); }
+.stat a { color: inherit; }
+
+/* What stands out */
+.callouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 12px; margin-top: 10px; }
+.callout {
+  background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--muted);
+  border-radius: 10px; padding: 12px 14px; min-width: 0;
+}
+.callout.bad { border-left-color: var(--fail); }
+.callout.good { border-left-color: var(--pass); }
+.callout h3 { margin: 0; font-size: 14px; display: flex; gap: 8px; align-items: baseline; }
+.callout h3 .n { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.callout p { margin: 2px 0 8px; font-size: 12.5px; color: var(--ink-2); }
+.callout ul { list-style: none; margin: 0; padding: 0; max-height: 236px; overflow: auto; }
+.callout li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 2px 10px; padding: 4px 0; font-size: 13px; border-top: 1px solid var(--grid); }
+.callout li:first-child { border-top: 0; }
+.callout li .linkish { flex: 1 1 160px; min-width: 0; }
+.callout li .meta { flex: none; color: var(--ink-2); font-variant-numeric: tabular-nums; display: inline-flex; gap: 6px; align-items: center; font-size: 12.5px; }
+
+/* Legend */
+.legend { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin: 8px 0 4px; }
+.scale { display: flex; flex-direction: column; gap: 4px; min-width: 260px; flex: 1 1 260px; max-width: 460px; }
+.scale .bar { height: 14px; border-radius: 4px; border: 1px solid var(--border); }
+.scale .ticks { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.scale .ticks span { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 40px; }
+.scale .ends { display: flex; justify-content: space-between; font-size: 12px; color: var(--ink-2); }
+.key-note { font-size: 12px; color: var(--ink-2); max-width: 440px; margin: 0; }
+.dashed-sample { display: inline-block; width: 18px; height: 12px; border: 1.5px dashed var(--ink-2); border-radius: 3px; vertical-align: -2px; }
+details.key { margin-top: 14px; }
+details.key > summary { cursor: pointer; color: var(--ink-2); font-size: 13px; }
+.keylist { display: grid; grid-template-columns: minmax(160px, 270px) 1fr; gap: 6px 16px; font-size: 12.5px; margin: 10px 0 0; }
+.keylist dt { font-weight: 600; }
+.keylist dd { margin: 0; color: var(--ink-2); }
+.keylist dd .muted { display: block; }
+
+/* Endpoint rows */
+.ep { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-top: 12px; }
+.ep-head { display: flex; align-items: baseline; gap: 10px; margin: 0 0 10px 2px; flex-wrap: wrap; }
+.ep-head b { font-size: 15px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 2px; }
+.tile {
+  position: relative; border-radius: 4px; padding: 8px 9px 7px; min-height: 104px;
+  display: flex; flex-direction: column; justify-content: space-between; cursor: pointer;
+  outline-offset: -2px;
+}
+.tile:hover { box-shadow: inset 0 0 0 2px rgba(127,127,127,.55); }
+.tile.all { outline: 2px solid var(--ink); }
+.tile.small { outline: 1.5px dashed currentColor; }
+.tile .mn { font-size: 12px; font-weight: 600; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.tile .mid { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+.tile .dv { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tile .dv.note { font-size: 13px; font-weight: 600; }
+.tile .rates { font-size: 11.5px; font-variant-numeric: tabular-nums; opacity: .92; }
+/* Pass rate in the later run as a meter, with a tick at the earlier run's rate. */
+.meter { position: relative; display: block; height: 4px; border-radius: 2px; margin-top: 5px;
+  background: color-mix(in srgb, currentColor 22%, transparent); }
+.meter i { display: block; height: 100%; border-radius: 2px; background: currentColor; }
+.meter b { position: absolute; top: -2px; width: 2px; height: 8px; margin-left: -1px; border-radius: 1px; background: currentColor; }
+.meter-sample { display: inline-block; width: 34px; vertical-align: 1px; margin: 0 2px; }
+.arrow { flex: none; transition: transform .2s; }
+
+/* Tooltip */
+#tip {
+  position: fixed; z-index: 10; pointer-events: none; max-width: 320px;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--border);
+  box-shadow: 0 6px 24px rgba(0,0,0,.18); border-radius: 8px; padding: 9px 11px; font-size: 12.5px;
+  display: none;
+}
+#tip b { display: block; margin-bottom: 3px; }
+#tip .tm { color: var(--ink-2); margin-bottom: 5px; }
+#tip .row { display: flex; justify-content: space-between; gap: 16px; font-variant-numeric: tabular-nums; }
+
+/* Golden table */
+.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg button { border: 0; background: none; color: var(--ink-2); padding: 6px 11px; font: inherit; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--chip); color: var(--ink); font-weight: 600; }
+select, input[type="search"] {
+  font: inherit; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--ink); max-width: 100%;
+}
+input[type="search"] { width: 240px; }
+.banner {
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: var(--chip);
+  border-radius: 8px; padding: 8px 12px; margin: 0 0 10px; font-size: 13px;
+}
+.banner[hidden] { display: none; }
+.table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 720px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--grid); vertical-align: middle; }
+th { font-size: 12px; color: var(--ink-2); font-weight: 600; white-space: nowrap; }
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--ink); }
+td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.frac { white-space: nowrap; }
+tr.g { cursor: pointer; }
+tr.g:hover td { background: var(--chip); }
+tr.g.flash td { animation: flash 1.8s ease-out; }
+@keyframes flash { from { background: var(--warn-bg); } to { background: transparent; } }
+.dcell { display: inline-flex; align-items: center; gap: 5px; border-radius: 4px; padding: 3px 8px 3px 5px; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 86px; white-space: nowrap; }
+.flag { font-size: 11px; padding: 1px 6px; border-radius: 10px; background: var(--chip); color: var(--ink-2); margin-left: 6px; white-space: nowrap; }
+.flag.edited { background: var(--warn-bg); color: var(--warn-ink); }
+.tier { display: inline-block; min-width: 19px; text-align: center; font-weight: 700; font-size: 11.5px; line-height: 16px;
+  border: 1.5px solid currentColor; border-radius: 4px; padding: 0 3px; }
+.tier.A { color: var(--tier-a); } .tier.B { color: var(--tier-b); } .tier.C { color: var(--tier-c); } .tier.D { color: var(--tier-d); }
+.tiers { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.dots { display: inline-flex; gap: 2px; margin-left: 6px; vertical-align: 0; }
+.dots i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.dots i.p { background: var(--pass); }
+.dots i.f { border: 1.5px solid var(--fail); }
+.detail > td { background: var(--page); padding: 12px 14px 16px; }
+tr.grp td { background: var(--chip); padding-top: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--grid); }
+tr.grp .grp-in { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+tr.grp b { font-size: 14px; }
+tr.grp .rate { font-variant-numeric: tabular-nums; color: var(--ink-2); font-size: 12.5px; }
+.detail .q { white-space: pre-wrap; color: var(--ink-2); font-size: 12.5px; margin: 0 0 8px; }
+.detail .lbl { font-size: 12px; font-weight: 600; margin: 12px 0 4px; }
+.detail .lbl:first-child { margin-top: 0; }
+.detail pre { white-space: pre-wrap; font-size: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 8px; max-height: 300px; overflow: auto; margin: 6px 0 0; }
+.detail details { margin-top: 8px; }
+.detail details > summary { cursor: pointer; color: var(--ink-2); font-size: 12.5px; }
+ins { background: var(--ins); text-decoration: none; border-radius: 2px; }
+del { background: var(--del); border-radius: 2px; }
+.mrow { display: grid; grid-template-columns: minmax(170px, 260px) 110px 1fr; gap: 10px; padding: 6px 0; border-top: 1px solid var(--grid); align-items: start; }
+.mrow:first-of-type { border-top: 0; }
+.mrow b[title] { cursor: help; }
+.mrow .reason { font-size: 12.5px; color: var(--ink-2); }
+.mrow .reason i { color: var(--muted); font-style: normal; }
+.answers { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.answers.one { grid-template-columns: 1fr; }
+.ans { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px; min-width: 0; }
+.ans h4 { margin: 0 0 4px; font-size: 12.5px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.ans .failed { font-size: 12px; color: var(--ink-2); }
+.badge { font-size: 11.5px; font-weight: 700; }
+.badge.pass { color: var(--pass); }
+.badge.fail { color: var(--fail); }
+.atts { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 8px; }
+.att { font: inherit; font-size: 12px; font-variant-numeric: tabular-nums; cursor: pointer; padding: 2px 8px; border-radius: 12px;
+  border: 1.5px solid var(--border); background: none; color: var(--ink-2); white-space: nowrap; }
+.att.pass b { color: var(--pass); } .att.fail b { color: var(--fail); }
+.att[aria-pressed="true"] { border-color: var(--ink); color: var(--ink); font-weight: 600; background: var(--chip); }
+.checks { list-style: none; margin: 0 0 6px; padding: 0; font-size: 12.5px; }
+.checks li { padding: 3px 0; border-top: 1px solid var(--grid); color: var(--ink-2); }
+.checks li:first-child { border-top: 0; }
+.checks li b { color: var(--ink); }
+.checks .mark { font-weight: 700; margin-right: 4px; }
+.checks .mark.pass { color: var(--pass); } .checks .mark.fail { color: var(--fail); }
+.plugin-error { font-size: 12.5px; background: var(--warn-bg); color: var(--warn-ink); border-radius: 6px; padding: 6px 9px; margin: 0 0 6px; }
+@media (max-width: 760px) {
+  .answers { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .mrow { grid-template-columns: 1fr; gap: 4px; }
+  .keylist { grid-template-columns: 1fr; gap: 2px; }
+  .keylist dd { margin-bottom: 8px; }
+  input[type="search"] { width: 100%; }
+  /* The question table fits the screen: no endpoint column, counts without dots. */
+  table.gtable { min-width: 0; }
+  .gtable thead th:nth-child(2), .gtable tr.g td:nth-child(2), .gtable tr.g .dots { display: none; }
+  .gtable th, .gtable td { padding: 7px 5px; }
+  .gtable th, .gtable td.num { white-space: normal; }
+  .gtable .dcell { min-width: 0; padding: 3px 6px; }
+  .gtable tr.g .dcell .arrow { display: none; }
+}
+.foot { color: var(--muted); font-size: 12px; margin-top: 28px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <div>
+      <h1>What changed between two eval runs</h1>
+      <p class="sub" id="subtitle"></p>
+    </div>
+    <button class="btn" id="copySummary" title="Copy a plain-text summary to paste into chat">Copy summary</button>
+  </div>
+  <textarea id="copyFallback" hidden aria-label="Summary to copy"></textarea>
+  <div id="warnings"></div>
+  <div class="stats" id="stats"></div>
+
+  <h2>What stands out</h2>
+  <div id="attention"></div>
+
+  <h2>How to read the colours</h2>
+  <div class="legend">
+    <div class="scale">
+      <div class="ends"><span>Got worse</span><span>No change</span><span>Got better</span></div>
+      <div class="bar" id="scalebar"></div>
+      <div class="ticks" id="scaleticks"></div>
+    </div>
+    <p class="key-note">
+      Colour and arrow both show the change in pass rate, in percentage points.
+      The deeper the colour and the steeper the arrow, the bigger the change: flat is no change,
+      straight up or down is a move of 50 points or more.
+      <span class="dashed-sample"></span> dashed outline = fewer than 10 attempts in a run, so read it with care.
+      Colour shows change, not level, so each tile also has a bar <span class="meter meter-sample"><i style="width:55%"></i><b style="left:80%"></b></span>:
+      its length is the pass rate in the later run and the tick is the earlier run's. An empty bar is a check that never passes, however grey the tile.
+    </p>
+  </div>
+  <div id="metricKey"></div>
+
+  <h2>By endpoint and metric</h2>
+  <p class="sub">Each row is a plugin endpoint, worst change first. The outlined tile is the share of attempts that passed every check; the other tiles are individual metrics. Every attempt counts as the run recorded it: a judged metric the judge wasn't asked, because a check that the answer is right had already failed, counts as failed. Hover a tile for the counts; click it to list the goldens behind it.</p>
+  <div id="endpoints"></div>
+
+  <h2 id="questions">By question</h2>
+  <p class="sub">Each golden's pass rate in both runs. Dots are attempts in order (filled = passed, hollow = failed). Tier is report.py's: A passed every attempt, B more than half, C some, D none. “Failing now” lists every golden that failed at least once in the later run, changed or not. Click a row for the metrics that moved and every attempt's answer, checks and reasons; click a column heading to sort.</p>
+  <div class="filters">
+    <input type="search" id="search" placeholder="Search names and questions" aria-label="Search goldens">
+    <div class="seg" id="dirFilter" aria-label="Direction">
+      <button data-v="changed" aria-pressed="true">Changed</button>
+      <button data-v="worse" aria-pressed="false">Got worse</button>
+      <button data-v="better" aria-pressed="false">Got better</button>
+      <button data-v="failing" aria-pressed="false">Failing now</button>
+      <button data-v="all" aria-pressed="false">All</button>
+    </div>
+    <select id="epFilter" aria-label="Endpoint"><option value="">All endpoints</option></select>
+    <select id="flagFilter" aria-label="Marked">
+      <option value="">Any golden</option>
+      <option value="regression">Marked regression</option>
+      <option value="waiting_on_plugin">Marked waiting on plugin</option>
+      <option value="edited">Edited between runs</option>
+    </select>
+    <div class="seg" id="orderBy" aria-label="Order">
+      <button data-v="change" aria-pressed="true">By change</button>
+      <button data-v="endpoint" aria-pressed="false">By endpoint</button>
+    </div>
+    <span class="muted" id="count"></span>
+  </div>
+  <div class="banner" id="banner" hidden></div>
+  <div class="table-wrap">
+    <table class="gtable">
+      <thead><tr>
+        <th class="sortable" data-sort="name" tabindex="0">Golden</th><th>Endpoint</th><th>Tier</th>
+        <th class="num sortable" data-sort="old" tabindex="0"></th><th class="num sortable" data-sort="new" tabindex="0"></th>
+        <th class="sortable" data-sort="change" tabindex="0">Change</th>
+      </tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+
+  <h2 id="speed">Speed and reliability</h2>
+  <p class="sub">How long the plugin took to answer: each golden's median time, then the median of those, so a golden asked more often doesn't count for more. Slowest change first. Over the time limit counts failed Plugin Latency checks; a crash is a request that failed or whose response couldn't be read; a retry is the plugin asking its model again, for example after invalid SQL.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Endpoint</th><th class="num" id="hBase"></th><th class="num" id="hNew"></th><th>Change</th>
+        <th class="num">Over the time limit</th><th class="num">Crashes</th><th class="num">Attempts with a retry</th>
+      </tr></thead>
+      <tbody id="healthRows"></tbody>
+    </table>
+  </div>
+  <p class="foot" id="foot"></p>
+</main>
+<div id="tip" role="tooltip"></div>
+
+<script>
+const DATA = /*__DATA__*/null;
+const SATURATE = 50;     // points of change that reach the deepest colour and a vertical arrow
+const SMALL_N = 10;      // fewer attempts than this in either run = dashed outline
+const COUNT_BAND = 10;   // points of change before a golden counts as better/worse in the headline
+const MAX_DOTS = 10;     // more attempts than this: counts only, no dots
+
+// ---------- colour scale (diverging: red = worse, grey = none, green = better) ----------
+// Red and green are hard to tell apart for red-green colour-blind readers; the arrow's
+// direction and the signed number carry the same information, so nothing relies on hue alone.
+const STOPS = {
+  light: {
+    worse:  ["#f0efec", "#f6d3d1", "#efa3a1", "#e66767", "#c93a39", "#8a1c1c"],
+    better: ["#f0efec", "#d4ecd2", "#a6d9a2", "#62b85c", "#2f8a2b", "#155e13"],
+  },
+  dark: {
+    worse:  ["#383835", "#4a2a28", "#6e2725", "#962826", "#bd2f2d", "#e03b39"],
+    better: ["#383835", "#263d26", "#1f5520", "#1d6f1f", "#228a25", "#2fa832"],
+  },
+};
+const isDark = () => {
+  const t = document.documentElement.dataset.theme;
+  if (t) return t === "dark";
+  return matchMedia("(prefers-color-scheme: dark)").matches;
+};
+const hex2rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
+function heat(delta) {
+  const stops = STOPS[isDark() ? "dark" : "light"];
+  if (delta == null) return stops.better[0];
+  const arm = delta < 0 ? stops.worse : stops.better;
+  const t = Math.min(Math.abs(delta) / SATURATE, 1) * (arm.length - 1);
+  const i = Math.min(Math.floor(t), arm.length - 2);
+  const c = mix(hex2rgb(arm[i]), hex2rgb(arm[i + 1]), t - i);
+  return `rgb(${c.join(",")})`;
+}
+function inkOn(rgb) {
+  const [r, g, b] = rgb.match(/\d+/g).map(Number).map(v => {
+    v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  });
+  const L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return L > 0.22 ? "#0b0b0b" : "#ffffff";
+}
+const bg = d => d == null ? (isDark() ? "#383835" : "#f0efec") : heat(d);
+
+// Arrow pointing right, tilted up for better and down for worse; 90° at SATURATE points.
+function arrow(delta, size = 22) {
+  const angle = delta == null ? 0 : -Math.max(-1, Math.min(1, delta / SATURATE)) * 90;
+  return `<svg class="arrow" width="${size}" height="${size}" viewBox="-12 -12 24 24" aria-hidden="true"
+    style="transform:rotate(${angle}deg)"><path d="M-9 0H7M2-5.5 8 0 2 5.5" fill="none"
+    stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+
+// ---------- helpers ----------
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pct = ([p, t]) => t ? Math.round(100 * p / t) + "%" : "–";
+const sign = d => { if (d == null) return "–"; const r = Math.round(d); return (r > 0 ? "+" : r < 0 ? "−" : "±") + Math.abs(r); };
+const pts = d => d == null ? "–" : sign(d) + " pts";
+const words = d => d == null ? "no data" : Math.abs(d) < 1 ? "no change" : d > 0 ? "better overall" : "worse overall";
+const frac = c => c[1] ? `${c[0]}/${c[1]}` : "–";
+// A metric the run didn't check at all (it was added or dropped between the runs).
+const fracCell = c => c[1] ? `<span class="frac">${c[0]}/${c[1]}</span>` : `<span class="muted">not checked</span>`;
+const score = s => s == null ? "–" : s.toFixed(2);
+const secs = s => s == null ? "–" : `${s.toFixed(1)}s`;
+// A golden's name, allowed to wrap only after its underscores.
+const gname = n => esc(n).replace(/_/g, "_<wbr>");
+const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
+const timeChange = (o, n) => o == null || n == null || o === 0 ? null : (n - o) / o * 100;
+const smooth = () => matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+const A = DATA.base, B = DATA.new;
+// Every golden in the table: those both runs asked, then those only one did.
+const ALLG = [...DATA.goldens, ...DATA.oneRun];
+const byName = new Map(ALLG.map(g => [g.name, g]));
+const runLabel = side => side === "base" ? A.label : B.label;
+const isEdited = g => Object.keys(g.edits).length > 0;
+const judgesDiffer = JSON.stringify(A.judges) !== JSON.stringify(B.judges);
+const epsByChange = () => [...DATA.endpoints].sort((a, b) => (a.all.delta ?? 0) - (b.all.delta ?? 0));
+function dots(s) {
+  if (!s || s.length > MAX_DOTS) return "";
+  return `<span class="dots" aria-hidden="true">${[...s].map(c => `<i class="${c === "1" ? "p" : "f"}"></i>`).join("")}</span>`;
+}
+// Pass rate in the later run as a bar, with a tick at the earlier run's rate.
+function meter(cell) {
+  if (!cell.new[1]) return "";
+  const tick = cell.old[1] ? `<b style="left:${100 * cell.old[0] / cell.old[1]}%"></b>` : "";
+  return `<span class="meter" aria-hidden="true"><i style="width:${100 * cell.new[0] / cell.new[1]}%"></i>${tick}</span>`;
+}
+const tierChip = t => t ? `<span class="tier ${t}">${t}</span>` : "";
+const tierPair = ([o, n]) => !o || !n || o === n ? `<span class="tiers">${tierChip(n || o)}</span>`
+  : `<span class="tiers" aria-label="tier ${o} to ${n}">${tierChip(o)}<span class="muted">→</span>${tierChip(n)}</span>`;
+const diffHtml = parts => parts.map(([op, t]) =>
+  op === "+" ? `<ins>${esc(t)}</ins>` : op === "-" ? `<del>${esc(t)}</del>` : esc(t)).join("");
+
+// ---------- header ----------
+const mins = r => r.duration ? `, ${Math.round(r.duration / 60)} min` : "";
+document.getElementById("subtitle").innerHTML =
+  `<b>${esc(A.label)}</b> (${A.goldens} goldens × ${A.reps}${mins(A)}) compared with ` +
+  `<b>${esc(B.label)}</b> (${B.goldens} goldens × ${B.reps}${mins(B)}). ` +
+  `${DATA.goldens.length} goldens appear in both runs and are compared.`;
+
+function nameList(names) {
+  return names.map(n => byName.has(n) ? `<button class="linkish" data-golden="${esc(n)}">${gname(n)}</button>` : gname(n)).join(", ");
+}
+const warns = [];
+if (judgesDiffer)
+  warns.push(`<b>The judge setup differs.</b> ${esc(A.label)}: ${esc(A.judges.join(", ") || "none")}. ` +
+             `${esc(B.label)}: ${esc(B.judges.join(", ") || "none")}. Some changes in judged ([GEval]) metrics may come from the judge, not the plugin.`);
+const edited = DATA.goldens.filter(isEdited);
+if (edited.length)
+  warns.push(`<b>${plural(edited.length, "golden was", "goldens were")} edited between the runs</b> (question or reference answer), ` +
+             `so ${edited.length === 1 ? "its" : "their"} change may come from the edit, not the plugin: ${nameList(edited.map(g => g.name))}.`);
+const oneRun = DATA.oneRun.length;
+if (oneRun) {
+  const lists = [DATA.onlyBase.length ? `Only in ${esc(A.label)}: ${nameList(DATA.onlyBase)}.` : "",
+                 DATA.onlyNew.length ? `Only in ${esc(B.label)}: ${nameList(DATA.onlyNew)}.` : ""].filter(Boolean).join(" ");
+  warns.push(`${plural(oneRun, "golden is", "goldens are")} in only one run, so ${oneRun === 1 ? "it has" : "they have"} no change to show ` +
+    `and ${oneRun === 1 ? "isn't" : "aren't"} in the before-and-after numbers. ${oneRun === 1 ? "It is" : "They are"} listed in the question table ` +
+    `with ${oneRun === 1 ? "its" : "their"} results. ` + (oneRun > 12 ? `<details><summary>Show which</summary>${lists}</details>` : lists));
+}
+if (DATA.notInSuite.length)
+  warns.push(`${plural(DATA.notInSuite.length, "golden in these runs has", "goldens in these runs have")} since been removed from the suite. ` +
+             `${DATA.notInSuite.length === 1 ? "It is" : "They are"} kept here like the others, marked “no longer in suite”: ${nameList(DATA.notInSuite)}.`);
+document.getElementById("warnings").innerHTML = warns.map(w => `<div class="warn">${w}</div>`).join("");
+
+// Goldens that failed at least one attempt in the later run, whether or not they changed.
+const failingNow = () => ALLG.filter(g => g.new[1] > 0 && g.new[0] < g.new[1]);
+function timeText(p) {
+  if (p == null) return "–";
+  const r = Math.round(p);
+  return r === 0 ? "no change" : `${r > 0 ? "+" : "−"}${Math.abs(r)}% ${r > 0 ? "slower" : "faster"}`;
+}
+function renderStats() {
+  const o = DATA.overall;
+  const better = DATA.goldens.filter(g => g.delta >= COUNT_BAND).length;
+  const worse = DATA.goldens.filter(g => g.delta <= -COUNT_BAND).length;
+  const epB = DATA.endpoints.filter(e => e.all.delta >= 5).length;
+  const epW = DATA.endpoints.filter(e => e.all.delta <= -5).length;
+  const c = bg(o.delta), ink = inkOn(c);
+  const h = DATA.health.overall, tc = timeChange(h.old.median, h.new.median);
+  const hc = tc == null ? bg(null) : heat(-tc), hink = inkOn(hc);
+  document.getElementById("stats").innerHTML = `
+    <div class="stat" style="background:${c};color:${ink}">
+      <div class="k" style="color:inherit;opacity:.85">Attempts passing every check</div>
+      <div class="v">${pct(o.old)} → ${pct(o.new)} ${arrow(o.delta, 26)}</div>
+      <div class="d" style="color:inherit;opacity:.85">${pts(o.delta)} (${o.old[0]}/${o.old[1]} → ${o.new[0]}/${o.new[1]}), goldens in both runs</div>
+      ${DATA.oneRun.length ? `<div class="d" style="color:inherit;opacity:.85">Every golden each run asked: ${pct(A.passed)} → ${pct(B.passed)}
+        (${A.passed[0]}/${A.passed[1]} → ${B.passed[0]}/${B.passed[1]})</div>` : ""}
+    </div>
+    <div class="stat"><div class="k">Endpoints that moved 5+ points</div>
+      <div class="v">${epB} better · ${epW} worse</div><div class="d">of ${DATA.endpoints.length} endpoints</div></div>
+    <div class="stat"><div class="k">Goldens that moved ${COUNT_BAND}+ points</div>
+      <div class="v">${better} better · ${worse} worse</div><div class="d">of ${DATA.goldens.length} compared</div>
+      <div class="d"><button class="linkish" data-dir="failing">${failingNow().length} of ${B.goldens} failed at least once in ${esc(B.label)}</button></div></div>
+    <div class="stat" style="background:${hc};color:${hink}">
+      <div class="k" style="color:inherit;opacity:.85">Median plugin response</div>
+      <div class="v">${secs(h.old.median)} → ${secs(h.new.median)} ${tc == null ? "" : arrow(-tc, 26)}</div>
+      <div class="d" style="color:inherit;opacity:.85">${timeText(tc)} · <a href="#speed">by endpoint</a></div>
+    </div>`;
+}
+
+// ---------- what stands out ----------
+function attention() {
+  const gs = DATA.goldens, inNew = ALLG.filter(g => g.new[1] > 0);
+  const regression = inNew.filter(g => g.flags.includes("regression") && g.new[0] < g.new[1]);
+  const broke = gs.filter(g => g.tier[0] === "A" && g.tier[1] !== "A" && !g.flags.includes("regression"));
+  const fixed = gs.filter(g => g.tier[0] !== "A" && g.tier[1] === "A");
+  const stuck = gs.filter(g => g.tier[0] === "D" && g.tier[1] === "D");
+  const expected = stuck.filter(g => g.flags.includes("waiting_on_plugin")).length;
+  const waiting = inNew.filter(g => g.flags.includes("waiting_on_plugin") && g.new[0] > 0);
+  const allPass = DATA.endpoints.filter(e => gs.every(g => g.endpoint !== e.name || g.tier[1] === "A"));
+  const worstFirst = (a, b) => (a.delta ?? 0) - (b.delta ?? 0) || a.name.localeCompare(b.name);
+  return [
+    {cls: "bad", title: "Regression goldens that failed", items: regression.sort(worstFirst),
+     note: `Marked "regression", so they should pass every run, but failed at least once in ${B.label}.`},
+    {cls: "bad", title: "Stopped passing every attempt", items: broke.sort(worstFirst),
+     note: `Passed every attempt in ${A.label}, failed at least once in ${B.label}.`},
+    {cls: "bad", title: "Failed every attempt in both runs", items: stuck.sort((a, b) => a.name.localeCompare(b.name)),
+     note: `No pass in ${A.label} or ${B.label}, so no change shows.` +
+           (expected ? ` ${expected} ${expected === 1 ? "is" : "are"} marked waiting on the plugin, so expected to fail.` : "")},
+    {cls: "good", title: "Now pass every attempt", items: fixed.sort((a, b) => worstFirst(b, a)),
+     note: `Failed at least once in ${A.label}, passed every attempt in ${B.label}.`},
+    {cls: "good", title: "Waiting on the plugin, yet passed", items: waiting.sort((a, b) => worstFirst(b, a)),
+     note: `Marked "waiting_on_plugin" (expected to fail until the plugin changes), but passed at least once in ${B.label}.`},
+    {cls: "info", title: "Every golden passes every attempt", endpoints: allPass,
+     note: `Endpoints with nothing left to show a change in ${B.label}: harder goldens would.`},
+  ].filter(c => (c.items || c.endpoints).length);
+}
+function renderAttention() {
+  const cards = attention(), el = document.getElementById("attention");
+  if (!cards.length) {
+    el.innerHTML = `<p class="sub">Nothing stands out: no regression golden failed, no golden stopped or started passing every attempt, and no golden waiting on the plugin passed.</p>`;
+    return;
+  }
+  el.innerHTML = `<div class="callouts">${cards.map(c => `
+    <div class="callout ${c.cls}">
+      <h3>${esc(c.title)} <span class="n">${(c.items || c.endpoints).length}</span></h3>
+      <p>${esc(c.note)}</p>
+      <ul>${c.items ? c.items.map(g => `<li><button class="linkish" data-golden="${esc(g.name)}">${gname(g.name)}</button>
+          <span class="meta">${g.flags.includes("waiting_on_plugin") ? `<span class="flag">waiting</span>` : ""}${tierPair(g.tier)} ${frac(g.old)} → ${frac(g.new)}</span></li>`).join("")
+        : c.endpoints.map(e => `<li><button class="linkish" data-endpoint="${esc(e.name)}">${esc(e.name)}</button>
+          <span class="meta">${plural(e.goldens, "golden")}</span></li>`).join("")}</ul>
+    </div>`).join("")}</div>`;
+}
+
+// ---------- legend ----------
+function renderLegend() {
+  const n = 40, cols = [];
+  for (let i = 0; i <= n; i++) cols.push(heat(-SATURATE + (2 * SATURATE * i) / n));
+  document.getElementById("scalebar").style.background = `linear-gradient(90deg, ${cols.join(",")})`;
+  document.getElementById("scaleticks").innerHTML = [-50, -25, 0, 25, 50]
+    .map(d => `<span>${arrow(d, 18)}${sign(d)}</span>`).join("");
+}
+(function renderKey() {
+  const info = DATA.metricInfo, names = Object.keys(info).filter(n => info[n].meaning);
+  if (!names.length) return;
+  document.getElementById("metricKey").innerHTML =
+    `<details class="key"><summary>What each metric checks</summary><dl class="keylist">${names.map(n =>
+      `<dt>${esc(n)}</dt><dd>Passes if ${esc(info[n].meaning)}${info[n].judgedBy ? `<span class="muted">${esc(info[n].judgedBy)}</span>` : ""}</dd>`).join("")}</dl></details>`;
+})();
+
+// ---------- endpoint tiles ----------
+const ALL_CHECKS = "Every check passed";
+const tileCell = (ei, mi) => mi < 0 ? DATA.endpoints[ei].all : DATA.endpoints[ei].metrics[mi];
+function tile(ei, mi) {
+  const cell = tileCell(ei, mi), name = mi < 0 ? ALL_CHECKS : cell.name, only = cell.only;
+  const c = bg(only ? null : cell.delta), ink = inkOn(c);
+  const small = !only && (cell.old[1] < SMALL_N || cell.new[1] < SMALL_N);
+  const said = only ? (only === "new" ? `checked only in ${B.label}` : `checked only in ${A.label}`)
+    : `${pct(cell.old)} to ${pct(cell.new)}, ${pts(cell.delta)}`;
+  return `<div class="tile ${mi < 0 ? "all" : ""} ${small ? "small" : ""}" role="button" tabindex="0"
+      data-ei="${ei}" data-mi="${mi}" style="background:${c};color:${ink}"
+      aria-label="${esc(DATA.endpoints[ei].name)}, ${esc(name)}: ${esc(said)}. Show its goldens.">
+    <div class="mn">${esc(name)}</div>
+    <div class="mid">${only ? `<span class="dv note">${only === "new" ? "new metric" : "not checked now"}</span>`
+      : `${arrow(cell.delta)}<span class="dv">${pts(cell.delta)}</span>`}</div>
+    <div class="rates">${pct(cell.old)} → ${pct(cell.new)}${meter(cell)}</div>
+  </div>`;
+}
+function renderEndpoints() {
+  document.getElementById("endpoints").innerHTML = epsByChange().map(e => {
+    const ei = DATA.endpoints.indexOf(e);
+    return `<section class="ep">
+      <div class="ep-head"><b>${esc(e.name)}</b>
+        <span class="muted">${plural(e.goldens, "golden")} · ${words(e.all.delta)}</span></div>
+      <div class="tiles">${tile(ei, -1)}${e.metrics.map((m, mi) => tile(ei, mi)).join("")}</div>
+    </section>`;
+  }).join("");
+}
+
+// tooltip
+const tip = document.getElementById("tip");
+function tipHtml(ei, mi) {
+  const e = DATA.endpoints[ei], d = tileCell(ei, mi);
+  const info = mi < 0 ? {meaning: "every metric passed in the attempt."} : (DATA.metricInfo[d.name] || {});
+  const small = !d.only && (d.old[1] < SMALL_N || d.new[1] < SMALL_N);
+  return `<b>${esc(e.name)} · ${esc(mi < 0 ? ALL_CHECKS : d.name)}</b>
+    ${info.meaning ? `<div class="tm">Passes if ${esc(info.meaning)}</div>` : ""}
+    <div class="row"><span>${esc(A.label)}</span><span>${d.old[1] ? `${d.old[0]}/${d.old[1]} passed (${pct(d.old)})` : "not checked"}</span></div>
+    <div class="row"><span>${esc(B.label)}</span><span>${d.new[1] ? `${d.new[0]}/${d.new[1]} passed (${pct(d.new)})` : "not checked"}</span></div>
+    ${d.score ? `<div class="row"><span>Mean score</span><span>${score(d.score[0])} → ${score(d.score[1])}${d.threshold != null ? ` (pass ${d.threshold})` : ""}</span></div>` : ""}
+    ${d.only ? "" : `<div class="row"><span>Change</span><span>${pts(d.delta)}, ${words(d.delta)}</span></div>`}
+    ${small ? `<div class="muted" style="margin-top:4px">Fewer than ${SMALL_N} attempts in a run: one flip moves this a lot.</div>` : ""}
+    <div class="muted" style="margin-top:4px">Click to list its goldens.</div>`;
+}
+function showTip(el, x, y) {
+  tip.innerHTML = tipHtml(+el.dataset.ei, +el.dataset.mi);
+  tip.style.display = "block";
+  const r = tip.getBoundingClientRect();
+  tip.style.left = Math.max(8, Math.min(x + 14, innerWidth - r.width - 8)) + "px";
+  tip.style.top = (y + 14 + r.height > innerHeight ? Math.max(8, y - r.height - 10) : y + 14) + "px";
+}
+document.addEventListener("mousemove", e => {
+  const el = e.target.closest?.(".tile");
+  if (el) showTip(el, e.clientX, e.clientY); else tip.style.display = "none";
+});
+document.addEventListener("focusin", e => {
+  const el = e.target.closest?.(".tile");
+  if (el) { const r = el.getBoundingClientRect(); showTip(el, r.left, r.bottom); }
+});
+document.addEventListener("focusout", () => tip.style.display = "none");
+addEventListener("scroll", () => { tip.style.display = "none"; }, {passive: true});
+const tilesEl = document.getElementById("endpoints");
+function openTile(t) {
+  const e = DATA.endpoints[+t.dataset.ei], mi = +t.dataset.mi;
+  tip.style.display = "none";
+  drill(e.name, mi < 0 ? null : e.metrics[mi].name);
+}
+tilesEl.addEventListener("click", e => { const t = e.target.closest(".tile"); if (t) openTile(t); });
+tilesEl.addEventListener("keydown", e => {
+  const t = e.target.closest(".tile");
+  if (t && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openTile(t); }
+});
+
+// ---------- golden table ----------
+const state = {dir: "changed", ep: "", flag: "", metric: null, q: "", sort: "change", asc: true, order: "change", note: ""};
+try { if (localStorage.getItem("evalDash.order") === "endpoint") state.order = "endpoint"; } catch (e) {}
+const open = new Set();
+const searchEl = document.getElementById("search");
+const epSel = document.getElementById("epFilter");
+const flagSel = document.getElementById("flagFilter");
+const dirBtns = document.querySelectorAll("#dirFilter button");
+const orderBtns = document.querySelectorAll("#orderBy button");
+const sortHeads = [...document.querySelectorAll("th[data-sort]")];
+const SORT_LABELS = {name: "Golden", old: A.label, new: B.label, change: "Change"};
+document.querySelector('#dirFilter [data-v="failing"]').title = `Failed at least one attempt in ${B.label}, changed or not`;
+[...new Set(DATA.goldens.map(g => g.endpoint))].sort().forEach(e =>
+  epSel.insertAdjacentHTML("beforeend", `<option value="${esc(e)}">${esc(e)}</option>`));
+if (DATA.oneRun.length)
+  flagSel.insertAdjacentHTML("beforeend", `<option value="only">Only in one run</option>`);
+if (DATA.notInSuite.length)
+  flagSel.insertAdjacentHTML("beforeend", `<option value="no_longer_in_suite">No longer in the suite</option>`);
+
+function syncControls() {
+  searchEl.value = state.q;
+  epSel.value = state.ep;
+  flagSel.value = state.flag;
+  dirBtns.forEach(x => x.setAttribute("aria-pressed", x.dataset.v === state.dir));
+  orderBtns.forEach(x => x.setAttribute("aria-pressed", x.dataset.v === state.order));
+  sortHeads.forEach(th => {
+    const on = th.dataset.sort === state.sort;
+    th.textContent = SORT_LABELS[th.dataset.sort] + (on ? (state.asc ? " ▲" : " ▼") : "");
+    th.setAttribute("aria-sort", on ? (state.asc ? "ascending" : "descending") : "none");
+  });
+  const banner = document.getElementById("banner");
+  banner.hidden = !state.metric && !state.note;
+  banner.innerHTML = state.metric ? `<span>Showing ${state.ep ? `<b>${esc(state.ep)}</b> ` : ""}goldens where
+    <b>${esc(state.metric)}</b> didn't pass every attempt in both runs. Their counts, dots and change below are that metric's.</span>
+    <button class="btn small" id="clearMetric">Show every check</button>`
+    : state.note ? `<span>${esc(state.note)}</span>` : "";
+}
+// Change the table's filters: any change clears a note left by a tile click.
+function setFilter(patch) {
+  Object.assign(state, {note: ""}, patch);
+  syncControls(); renderRows();
+}
+searchEl.addEventListener("input", () => setFilter({q: searchEl.value.trim()}));
+epSel.onchange = () => setFilter({ep: epSel.value});
+flagSel.onchange = () => setFilter({flag: flagSel.value});
+dirBtns.forEach(b => b.onclick = () => setFilter({dir: b.dataset.v}));
+orderBtns.forEach(b => b.onclick = () => {
+  try { localStorage.setItem("evalDash.order", b.dataset.v); } catch (e) {}
+  setFilter({order: b.dataset.v});
+});
+// Click a heading to sort by it; click it again to reverse.
+const sortBy = key => setFilter(key === state.sort ? {asc: !state.asc} : {sort: key, asc: true});
+sortHeads.forEach(th => {
+  th.onclick = () => sortBy(th.dataset.sort);
+  th.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); sortBy(th.dataset.sort); } };
+});
+document.getElementById("banner").addEventListener("click", e => {
+  if (e.target.id === "clearMetric") setFilter({metric: null});
+});
+
+// The numbers a row shows: the golden's, or with a metric picked, that metric's.
+const focusOf = g => state.metric ? g.metrics.find(m => m.name === state.metric) || null : g;
+function shown(dir = state.dir) {
+  const q = state.q.toLowerCase();
+  return ALLG.filter(g => {
+    if (state.ep && g.endpoint !== state.ep) return false;
+    if (state.flag && !(state.flag === "edited" ? isEdited(g) : state.flag === "only" ? g.only : g.flags.includes(state.flag))) return false;
+    if (q && !g.name.toLowerCase().includes(q) && !g.input.toLowerCase().includes(q)) return false;
+    const f = focusOf(g);
+    if (!f) return false;
+    if (dir === "failing") return f.new[1] > 0 && f.new[0] < f.new[1];
+    // A golden only one run asked has no change: shown under All, or when asked for.
+    if (dir === "all" || g.only) return dir === "all" || state.flag === "only";
+    if (f.delta == null) return dir === "changed" && (f.old[1] > 0) !== (f.new[1] > 0);
+    return dir === "changed" ? Math.abs(f.delta) >= 1 : dir === "worse" ? f.delta <= -1 : f.delta >= 1;
+  });
+}
+function renderRows() {
+  // By the chosen column, with those that have nothing in it (in one run only) last.
+  const rate = c => c[1] ? c[0] / c[1] : null;
+  const key = {change: g => focusOf(g).delta, old: g => rate(focusOf(g).old), new: g => rate(focusOf(g).new)}[state.sort];
+  const gs = shown().sort((a, b) => {
+    const nameOrder = a.name.localeCompare(b.name);
+    if (!key) return state.asc ? nameOrder : -nameOrder;
+    const x = key(a), y = key(b);
+    if (x == null || y == null) return (x == null) - (y == null) || nameOrder;
+    return (state.asc ? x - y : y - x) || nameOrder;
+  });
+  document.getElementById("count").textContent = `${gs.length} of ${plural(ALLG.length, "golden")}`;
+  const none = `<tr><td colspan="6" class="muted">No goldens match. Try “All”, or clear the search.</td></tr>`;
+  if (state.order === "endpoint") {
+    // Same order as the endpoint section, worst overall change first, then
+    // any endpoint only one run asked about.
+    const names = epsByChange().map(e => e.name);
+    gs.forEach(g => { if (!names.includes(g.endpoint)) names.push(g.endpoint); });
+    rowsEl.innerHTML = names.map(name => {
+      const inGroup = gs.filter(g => g.endpoint === name);
+      if (!inGroup.length) return "";
+      const e = DATA.endpoints.find(x => x.name === name);
+      const total = ALLG.filter(g => g.endpoint === name).length;
+      return `<tr class="grp"><td colspan="6"><div class="grp-in"><b>${esc(name)}</b>
+          ${e ? `${dcell(e.all.delta)}<span class="rate">every check passed ${pct(e.all.old)} → ${pct(e.all.new)} ·` : `<span class="rate">in one run only ·`}
+          ${inGroup.length} of ${plural(total, "golden")} shown</span></div></td></tr>` +
+        inGroup.map(rowHtml).join("");
+    }).join("") || none;
+    return;
+  }
+  rowsEl.innerHTML = gs.map(rowHtml).join("") || none;
+}
+function dcell(delta) {
+  const c = bg(delta);
+  return `<span class="dcell" style="background:${c};color:${inkOn(c)}">${arrow(delta, 18)}${pts(delta)}</span>`;
+}
+// A count, or for a golden only one run asked, what the other run lacks.
+const count = (g, c, side) => g.only && g.only !== side ? `<span class="muted">not in this run</span>` : fracCell(c);
+function rowHtml(g) {
+  const f = focusOf(g), isOpen = open.has(g.name);
+  return `
+    <tr class="g" data-name="${esc(g.name)}" tabindex="0" aria-expanded="${isOpen}">
+      <td>${isOpen ? "▾" : "▸"} ${gname(g.name)}${g.flags.map(fl => `<span class="flag">${esc(fl.replace(/_/g, " "))}</span>`).join("")}${
+        isEdited(g) ? `<span class="flag edited" title="The question or reference answer changed between the runs">edited</span>` : ""}</td>
+      <td class="muted">${esc(g.endpoint)}</td>
+      <td>${tierPair(g.tier)}</td>
+      <td class="num">${count(g, f.old, "base")}${dots(f.dots[0])}</td>
+      <td class="num">${count(g, f.new, "new")}${dots(f.dots[1])}</td>
+      <td>${g.only ? `<span class="muted">only in ${esc(runLabel(g.only))}</span>` : dcell(f.delta)}</td>
+    </tr>${isOpen ? detail(g) : ""}`;
+}
+function metricRow(m, g) {
+  const info = DATA.metricInfo[m.name] || {};
+  const why = m.reason ? `<i>${esc(B.label)}:</i> ${esc(m.reason)}`
+    : m.oldReason ? `<i>${esc(A.label)}${m.new[1] ? `, passes in ${esc(B.label)}` : ""}:</i> ${esc(m.oldReason)}` : "";
+  return `<div class="mrow">
+    <div><b${info.meaning ? ` title="${esc("Passes if " + info.meaning)}"` : ""}>${esc(m.name)}</b>
+      <div class="muted num">${count(g, m.old, "base")}${dots(m.dots[0])} → ${count(g, m.new, "new")}${dots(m.dots[1])}</div>
+      ${m.score ? `<div class="muted num">mean score ${score(m.score[0])} → ${score(m.score[1])}${m.threshold != null ? `, pass mark ${m.threshold}` : ""}</div>` : ""}</div>
+    <div>${g.only ? "" : dcell(m.delta)}</div>
+    <div class="reason">${why}</div>
+  </div>`;
+}
+// Which attempt of each run a golden's detail shows: "<name>|old" -> index.
+const picked = new Map();
+const pickedIndex = (g, side) => picked.get(`${g.name}|${side}`) ?? g.show[side];
+// `same` names an earlier check in the list that failed with this very reason.
+function checkLine(m, same) {
+  if (same) m = {...m, reason: `same reason as ${same}`};
+  const notJudged = m.reason.startsWith("not judged:");
+  const scored = m.score != null && !notJudged && (m.judged || (m.score > 0 && m.score < 1));
+  return `<li><span class="mark ${m.ok ? "pass" : "fail"}">${m.ok ? "✓" : "✕"}</span><b>${esc(m.name)}</b>${
+    scored ? ` <span class="num">${score(m.score)}${m.threshold != null ? ` / ${m.threshold}` : ""}</span>` : ""}${
+    m.reason ? `: ${esc(m.reason)}` : ""}</li>`;
+}
+// One run's panel: a button per attempt, then the chosen attempt's failed
+// checks with their reasons, the plugin's answer, and the checks it passed.
+function answerPanel(g, side) {
+  const atts = g.attempts[side], label = runLabel(side === "old" ? "base" : "new");
+  if (!atts.length) return "";
+  const i = Math.min(pickedIndex(g, side), atts.length - 1), a = atts[i];
+  const failed = a.metrics.filter(m => !m.ok), passed = a.metrics.filter(m => m.ok);
+  const errorShown = a.error && !(a.output || "").includes(a.error.slice(0, 60));
+  return `<div class="ans" data-side="${side}">
+    <h4>${esc(label)} <span class="muted">${plural(atts.length, "attempt")}, ${atts.filter(x => x.passed).length} passed</span></h4>
+    <div class="atts" role="group" aria-label="Attempts in ${esc(label)}">${atts.map((x, n) =>
+      `<button class="att ${x.passed ? "pass" : "fail"}" data-att="${n}" aria-pressed="${n === i}"
+         aria-label="Attempt ${n + 1}, ${x.passed ? "passed" : "failed"}">${n + 1} <b>${x.passed ? "✓" : "✕"}</b></button>`).join("")}</div>
+    <div class="failed"><span class="badge ${a.passed ? "pass" : "fail"}">Attempt ${i + 1} ${a.passed ? "passed" : "failed"}</span>
+      <span class="muted">${a.time != null ? ` · ${a.time}s` : ""}${a.retries ? ` · ${plural(a.retries, "retry", "retries")} inside the plugin` : ""}${a.crashed ? " · the request failed" : ""}</span></div>
+    ${failed.length ? `<ul class="checks">${failed.map((m, n) =>
+      checkLine(m, m.reason.length > 80 ? failed.slice(0, n).find(x => x.reason === m.reason)?.name : null)).join("")}</ul>` : ""}
+    ${errorShown ? `<div class="plugin-error"><b>Plugin error:</b> ${esc(a.error)}</div>` : ""}
+    ${a.output ? `<pre>${esc(a.output)}</pre>` : `<p class="muted">${a.crashed ? "No answer: the request failed." : "No answer."}</p>`}
+    ${a.extras.map(([l, t]) => `<details><summary>${esc(l)}</summary><pre>${esc(t)}</pre></details>`).join("")}
+    ${passed.length ? `<details><summary>${plural(passed.length, "check")} passed</summary><ul class="checks">${passed.map(m => checkLine(m)).join("")}</ul></details>` : ""}
+  </div>`;
+}
+function detail(g) {
+  const parts = [];
+  if (g.edits.input)
+    parts.push(`<p class="lbl">Question, edited between the runs <span class="muted">(<del>struck out</del>: only in ${esc(A.label)};
+      <ins>highlighted</ins>: only in ${esc(B.label)})</span></p><p class="q">${diffHtml(g.edits.input)}</p>`);
+  else
+    parts.push(`<p class="q">${esc(g.input)}</p>`);
+  parts.push(g.metrics.length ? g.metrics.map(m => metricRow(m, g)).join("")
+    : `<p class="muted">Every metric passed every attempt${g.only ? "" : " in both runs"}.</p>`);
+  parts.push(`<p class="lbl">${g.only ? `Every attempt in ${esc(runLabel(g.only))}, the only run that asked it` : "Every attempt in each run"}
+      <span class="muted">(pick an attempt to see its answer and checks)</span></p>
+    <div class="answers${g.only ? " one" : ""}">${answerPanel(g, "old")}${answerPanel(g, "new")}</div>`);
+  if (g.edits.expected)
+    parts.push(`<details open><summary>Reference answer, edited between the runs</summary><pre>${diffHtml(g.edits.expected)}</pre></details>`);
+  else if (g.expected)
+    parts.push(`<details><summary>Reference answer</summary><pre>${esc(g.expected)}</pre></details>`);
+  return `<tr class="detail"><td colspan="6">${parts.join("")}</td></tr>`;
+}
+const toggleRow = tr => { const n = tr.dataset.name; open.has(n) ? open.delete(n) : open.add(n); renderRows(); };
+const rowsEl = document.getElementById("rows");
+rowsEl.addEventListener("click", e => {
+  const att = e.target.closest("[data-att]");
+  if (att) {  // show another attempt in that run's panel, leaving the rest of the row as it is
+    const panel = att.closest(".ans"), tr = att.closest("tr.detail").previousElementSibling;
+    const g = byName.get(tr.dataset.name), side = panel.dataset.side;
+    picked.set(`${g.name}|${side}`, +att.dataset.att);
+    panel.outerHTML = answerPanel(g, side);
+    tr.nextElementSibling.querySelector(`.ans[data-side="${side}"] [aria-pressed="true"]`)?.focus();
+    return;
+  }
+  if (e.target.closest("summary, pre, a, button")) return;
+  const tr = e.target.closest("tr.g"); if (tr) toggleRow(tr);
+});
+rowsEl.addEventListener("keydown", e => {
+  const tr = e.target.closest("tr.g"); if (tr && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); toggleRow(tr); }
+});
+
+// Jump to one golden: clear the filters that would hide it, open it and scroll to it.
+function reveal(name) {
+  if (!byName.has(name)) return;
+  open.add(name);
+  setFilter({dir: "all", ep: "", flag: "", metric: null, q: ""});
+  const tr = [...rowsEl.querySelectorAll("tr.g")].find(t => t.dataset.name === name);
+  if (!tr) return;
+  tr.scrollIntoView({block: "start", behavior: smooth()});
+  tr.focus({preventScroll: true});
+  tr.classList.add("flash");
+}
+// List an endpoint's goldens, optionally only those where one metric moved.
+// With nothing changed, all of them; with a metric that passed every attempt
+// in both runs, every golden of the endpoint, saying so.
+function drill(ep, metric, dir = "changed") {
+  Object.assign(state, {ep, metric, dir, flag: "", q: "", note: ""});
+  if (!shown().length) state.dir = "all";
+  if (metric && !shown().length) {
+    state.metric = null;
+    state.note = `${metric} passed every attempt of every ${ep} golden in both runs, so here are all its goldens.`;
+  }
+  syncControls(); renderRows();
+  document.getElementById("questions").scrollIntoView({behavior: smooth()});
+}
+document.addEventListener("click", e => {
+  const g = e.target.closest("[data-golden]");
+  if (g) { reveal(g.dataset.golden); return; }
+  const d = e.target.closest("[data-dir]");
+  if (d) {
+    setFilter({dir: d.dataset.dir, ep: "", flag: "", metric: null, q: ""});
+    document.getElementById("questions").scrollIntoView({behavior: smooth()});
+    return;
+  }
+  const ep = e.target.closest("[data-endpoint]");
+  if (ep) drill(ep.dataset.endpoint, null, "all");
+});
+
+// ---------- speed and reliability ----------
+function renderHealth() {
+  document.getElementById("hBase").textContent = A.label;
+  document.getElementById("hNew").textContent = B.label;
+  const change = h => timeChange(h.old.median, h.new.median);
+  const eps = [...DATA.health.endpoints].sort((a, b) => (change(b) ?? 0) - (change(a) ?? 0));
+  const share = (n, of) => of ? `${Math.round(100 * n / of)}%` : "–";
+  document.getElementById("healthRows").innerHTML = [DATA.health.overall, ...eps].map((h, i) => {
+    const tc = change(h), c = tc == null ? bg(null) : heat(-tc);
+    const name = i === 0 ? `<b>${esc(h.name)}</b>` : esc(h.name);
+    return `<tr>
+      <td>${name} <span class="muted">${plural(h.goldens, "golden")}</span></td>
+      <td class="num">${secs(h.old.median)}</td><td class="num">${secs(h.new.median)}</td>
+      <td><span class="dcell" style="background:${c};color:${inkOn(c)}">${tc == null ? "" : arrow(-tc, 18)}${timeText(tc)}</span></td>
+      <td class="num">${frac(h.old.over)} → ${frac(h.new.over)}</td>
+      <td class="num" title="of ${h.old.attempts} and ${h.new.attempts} attempts">${h.old.crashed} → ${h.new.crashed}</td>
+      <td class="num" title="${h.old.retried} of ${h.old.attempts} → ${h.new.retried} of ${h.new.attempts}">${share(h.old.retried, h.old.attempts)} → ${share(h.new.retried, h.new.attempts)}</td>
+    </tr>`;
+  }).join("");
+}
+
+// ---------- copy summary ----------
+function summaryText() {
+  const o = DATA.overall, h = DATA.health.overall, L = [];
+  L.push(`Eval runs compared: ${A.label} → ${B.label} (${DATA.goldens.length} goldens in both)`);
+  L.push(`Attempts passing every check, goldens in both runs: ${pct(o.old)} → ${pct(o.new)} (${pts(o.delta)})`);
+  if (DATA.oneRun.length)
+    L.push(`Every golden each run asked: ${pct(A.passed)} (${A.goldens} goldens) → ${pct(B.passed)} (${B.goldens} goldens)`);
+  L.push(`Failed at least once in ${B.label}: ${failingNow().length} of ${B.goldens} goldens`);
+  if (h.old.median != null && h.new.median != null)
+    L.push(`Median plugin response: ${secs(h.old.median)} → ${secs(h.new.median)} (${timeText(timeChange(h.old.median, h.new.median))})`);
+  L.push("", "By endpoint, attempts passing every check:");
+  epsByChange().forEach(e => L.push(`- ${e.name}: ${pct(e.all.old)} → ${pct(e.all.new)} (${pts(e.all.delta)})`));
+  attention().forEach(c => {
+    L.push("", `${c.title}:`);
+    if (c.items && c.items.length > 12) L.push(c.items.map(g => g.name).join(", "));
+    else if (c.items) c.items.forEach(g => L.push(`- ${g.name}: ${frac(g.old)} → ${frac(g.new)}`));
+    else c.endpoints.forEach(e => L.push(`- ${e.name}`));
+  });
+  for (const side of ["new", "base"]) {
+    const only = DATA.oneRun.filter(g => g.only === side);
+    if (!only.length) continue;
+    L.push("", `Only in ${runLabel(side)} (no change to show):`);
+    only.forEach(g => L.push(`- ${g.name}: ${frac(side === "new" ? g.new : g.old)}`));
+  }
+  if (edited.length) L.push("", `Edited between the runs, so the change may come from the edit: ${edited.map(g => g.name).join(", ")}`);
+  if (judgesDiffer) L.push("", "Note: the judge setup differs between the runs.");
+  return L.join("\n");
+}
+document.getElementById("copySummary").addEventListener("click", async e => {
+  const btn = e.currentTarget, text = summaryText(), fallback = document.getElementById("copyFallback");
+  let ok = false;
+  try { await navigator.clipboard.writeText(text); ok = true; } catch (err) {}
+  if (!ok) {
+    fallback.hidden = false; fallback.value = text; fallback.select();
+    try { ok = document.execCommand("copy"); } catch (err) {}
+  }
+  if (ok) fallback.hidden = true;
+  btn.textContent = ok ? "Copied" : "Select and copy the text below";
+  setTimeout(() => { btn.textContent = "Copy summary"; }, 2000);
+});
+
+document.getElementById("foot").textContent =
+  `Built ${DATA.generated} from ${A.file} and ${B.file}. Pass rates are per attempt, so runs with different repetition counts compare fairly.`;
+
+if (!shown().length) state.dir = "all";
+syncControls();
+function renderAll() { renderStats(); renderAttention(); renderLegend(); renderEndpoints(); renderRows(); renderHealth(); }
+renderAll();
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", renderAll);
+</script>
+</body>
+</html>
