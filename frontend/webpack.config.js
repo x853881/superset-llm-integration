@@ -1,0 +1,74 @@
+const path = require("path");
+const { ModuleFederationPlugin } = require("webpack").container;
+const packageConfig = require("./package");
+const extensionConfig = require("../extension.json");
+
+module.exports = (env, argv) => {
+  const isProd = argv.mode === "production";
+
+  return {
+    entry: isProd ? {} : "./src/index.tsx",
+    mode: isProd ? "production" : "development",
+    devServer: {
+      port: 3000,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+      },
+    },
+    output: {
+      clean: true,
+      filename: isProd ? undefined : "[name].[contenthash].js",
+      chunkFilename: "[name].[contenthash].js",
+      path: path.resolve(__dirname, "dist"),
+      publicPath: `/api/v1/extensions/${extensionConfig.publisher}/${extensionConfig.name}/`,
+    },
+    resolve: {
+      extensions: [".ts", ".tsx", ".js", ".jsx"],
+    },
+    externalsType: "window",
+    externals: {
+      "@apache-superset/core": "superset",
+    },
+    module: {
+      rules: [
+        {
+          test: /\.tsx?$/,
+          use: "ts-loader",
+          exclude: /node_modules/,
+        },
+      ],
+    },
+    plugins: [
+      new ModuleFederationPlugin({
+        name: "waxwing_nltosqlandback",
+        filename: "remoteEntry.[contenthash].js",
+        exposes: {
+          "./index": "./src/index.tsx",
+        },
+        shared: {
+          react: {
+            singleton: true,
+            requiredVersion: packageConfig.peerDependencies.react,
+            import: false,
+          },
+          "react-dom": {
+            singleton: true,
+            requiredVersion: packageConfig.peerDependencies["react-dom"],
+            import: false,
+          },
+          // Superset shares its own antd instance into the "default" share scope (eagerly, as a
+          // singleton - see the host's webpack.config.js), so the panel's antd components are
+          // literally the host's: same version, same ConfigProvider, therefore the same theme
+          // tokens Superset's own UI is drawn with. `import: false` keeps antd out of this
+          // bundle entirely rather than shipping a second copy that would have to be themed
+          // separately.
+          antd: {
+            singleton: true,
+            requiredVersion: packageConfig.peerDependencies.antd,
+            import: false,
+          },
+        },
+      }),
+    ],
+  };
+};

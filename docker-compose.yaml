@@ -1,0 +1,41 @@
+# Dev-only Superset for working on this extension.
+# Usage:
+#   docker compose up            # starts Superset on http://localhost:8088 (admin / admin)
+#   superset-extensions dev      # in another terminal, on your host, in this repo
+#
+# Override the image with: SUPERSET_IMAGE=apache/superset:<tag> docker compose up
+
+services:
+  superset:
+    image: ${SUPERSET_IMAGE:-apache/superset:latest}
+    ports:
+      - "8088:8088"
+    environment:
+      SUPERSET_CONFIG_PATH: /app/dev/superset_config.py
+      FLASK_DEBUG: "1"
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      # e.g. http://phoenix:6006 when started with `--profile phoenix`
+      NLSQL_PHOENIX_ENDPOINT: ${NLSQL_PHOENIX_ENDPOINT:-}
+    volumes:
+      # Dev config + startup script
+      - ./dev/superset_config.py:/app/dev/superset_config.py:ro
+      - ./dev/start.sh:/app/dev/start.sh:ro
+      # This repo, loaded from disk via LOCAL_EXTENSIONS
+      - ./:/app/extensions/nltosqlandback
+      # Persist the SQLite metadata DB between restarts
+      - superset_home:/app/superset_home
+    command: ["bash", "/app/dev/start.sh"]
+
+  # Optional: Arize Phoenix, to see every LLM call as a trace. Start with
+  #   NLSQL_PHOENIX_ENDPOINT=http://phoenix:6006 docker compose --profile phoenix up
+  # and open http://localhost:6006.
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    profiles: ["phoenix"]
+    ports:
+      - "6006:6006"
+
+volumes:
+  superset_home:
+
+

@@ -1,0 +1,9 @@
+{
+  "publisher": "waxwing",
+  "name": "nltosqlandback",
+  "displayName": "NL to SQL and back",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "description": "Adds an AI assistant panel to SQL Lab - describe, refine, fix, accelerate and generate SQL via any OpenAI-compatible LLM (local Ollama by default), alongside Superset's own SQL editor. Every LLM call is logged (optionally to Arize Phoenix).",
+  "permissions": ["can_read"]
+}

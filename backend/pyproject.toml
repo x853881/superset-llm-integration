@@ -1,0 +1,24 @@
+[project]
+name = "waxwing-nltosqlandback"
+version = "0.1.0"
+license = "Apache-2.0"
+description = "SQL Lab AI assistant: describe, refine, fix, accelerate and generate SQL via any OpenAI-compatible LLM, with per-user LLM call logging (optionally to Arize Phoenix)"
+requires-python = ">=3.9"
+dependencies = [
+    "requests>=2.31",
+    "sqlglot>=28.10",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+]
+
+[tool.apache_superset_extensions.build]
+# Files to include in the extension build/bundle
+include = [
+    "src/waxwing/nltosqlandback/**/*.py",
+    "src/waxwing/nltosqlandback/resources/*.json",
+    "src/waxwing/nltosqlandback/resources/*.jsonl",
+]
+exclude = []
